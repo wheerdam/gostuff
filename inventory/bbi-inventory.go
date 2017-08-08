@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"net/http"
 	"html/template"
 	"database/sql"
@@ -17,13 +18,22 @@ var db *sql.DB
 type ViewPageFields struct {
 	UserName 	string
 	ViewTitle	string
+	ViewOps		interface{}
 	Data 		[]Item
 }
 
 type ItemPageFields struct {
 	UserName	string
-	Info		Item
+	Info		*Item
 	InvEntries	[]InventoryEntry
+}
+
+type AddEditPageFields struct {
+	UserName	string
+	Header		string
+	Info		*Item
+	InvEntries	[]InventoryEntry
+	Footer		interface{}
 }
 
 type MessagePage struct {
@@ -38,8 +48,8 @@ func LoginPage(w http.ResponseWriter, r *http.Request) {
     } else {
         r.ParseForm()
         // logic part of log in
-		userName := r.Form["username"][0]
-		err := users.Login(userName, r.Form["password"][0])
+		userName := r.FormValue("username")
+		err := users.Login(userName, r.FormValue("password"))
 		if err != nil {
 			t, _ := template.ParseFiles("message.gtpl")
 			msg := MessagePage{
@@ -97,26 +107,43 @@ func ViewPage(w http.ResponseWriter, r *http.Request) {
 	} else {
 		t, _ := template.ParseFiles("view.gtpl")
 		userName := s.CAttr("UserName")
-		viewTitle := "View Items"
+		viewOps := ""
+		logicOr := false
 		var items []Item		
 		if len(r.URL.Query()) > 0 {
 			filters := make([]FetchFilter, 0)
 			for k, v := range r.URL.Query() {
 				for i := range v {
-					filter := FetchFilter{key: k, value: v[i]}
-					filters = append(filters, filter)
-					viewTitle = viewTitle + " " + k + "=" + v[i]
+					if k == "op" && v[i] == "or" {
+						logicOr = true
+					} else {
+						filter := FetchFilter{key: k, value: v[i]}
+						filters = append(filters, filter)
+						viewOps = viewOps + " '" + k + "=" + v[i] + "'"
+					}
 				}				
 			}
-			items = getItemsFiltered(filters...)
+			items = getItemsFiltered(logicOr, filters...)
 		} else {
 			items = getItems()
 		}
 		viewData := ViewPageFields{
 				UserName: userName.(string),
-				ViewTitle: viewTitle,
+				ViewTitle: "View Items",
 				Data: items,
 		}
+		if viewOps != ""  {
+			if logicOr {
+				viewOps = "OR = " + viewOps
+			} else {
+				viewOps = "AND = " + viewOps
+			}
+			viewData.ViewOps = template.HTML(
+				"<a href=\"./view\">View All Items</a> - " + viewOps)
+		} else {
+			viewData.ViewOps = "Viewing All Items"
+		}
+		
 		t.Execute(w, viewData)
 	}
 }
@@ -127,7 +154,12 @@ func ItemPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "./login", 301)
 		return
 	}
-	itemID := r.URL.Query().Get("id")
+	var itemID string
+	if r.Method == "GET" {
+		itemID = r.URL.Query().Get("id")
+	} else {
+		itemID = r.FormValue("id")
+	}
 	if itemID == "" {
 		t, _ := template.ParseFiles("message.gtpl")
 		msg := MessagePage{
@@ -145,7 +177,9 @@ func ItemPage(w http.ResponseWriter, r *http.Request) {
 			msg := MessagePage{
 					Header: "Failed to Process Item",
 					Message: template.HTML(
-							"<p>ItemID: " + itemID + "</p>",
+							"<p>ItemID: " + itemID + "</p>" +
+							"<p><a href=\"./edit?id=" + itemID + 
+							"\">Add/Edit Item</a></p>",
 					),
 			}
 			errT.Execute(w, msg)
@@ -154,25 +188,150 @@ func ItemPage(w http.ResponseWriter, r *http.Request) {
 		userName := s.CAttr("UserName")
 		itemData := ItemPageFields{
 				UserName:	userName.(string),
-				Info:		*item,
+				Info:		item,
 				InvEntries:	invEntries,
 		}
 		t.Execute(w, itemData)
 	}
 }
 
-func NewItemPage(w http.ResponseWriter, r *http.Request) {
+func DeletePage(w http.ResponseWriter, r *http.Request) {
 	s := session.Get(r)
 	if s == nil {
 		http.Redirect(w, r, "./login", 301)
 		return
 	}
-	
+	var itemID string
+	if r.Method == "GET" {
+		itemID = r.URL.Query().Get("id")
+	} else {
+		itemID = r.FormValue("id")
+	}
+	if itemID == "" {
+		t, _ := template.ParseFiles("message.gtpl")
+		msg := MessagePage{
+				Header: "Missing Item ID",
+				Message: template.HTML(
+						"<p>ItemID was not provided in the URL</p>",
+				),
+		}
+		t.Execute(w, msg)
+	} else {
+		err := deleteItem(itemID)
+		if err != nil {
+			errT, _ := template.ParseFiles("message.gtpl")
+			msg := MessagePage{
+					Header: "Failed to Process Item",
+					Message: template.HTML(
+							"<p>Error: " + err.Error() + "</p>",
+					),
+			}
+			errT.Execute(w, msg)
+		} else {
+			http.Redirect(w, r, "./view", 301)
+		}
+	}
 }
 
-func InventoryPage(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte("Inventory Page.\n"))
+func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
+	s := session.Get(r)
+	if s == nil {
+		http.Redirect(w, r, "./login", 301)
+		return
+	}
+	var itemID string
+	if r.Method == "GET" {
+		itemID = r.URL.Query().Get("id")
+	} else {
+		itemID = r.FormValue("id")
+	}
+	t, _ := template.ParseFiles("edit.gtpl")
+	item, invEntries, err := getItem(itemID)
+	if itemID == "" || err != nil {
+		errT, _ := template.ParseFiles("message.gtpl")
+		// errStr := fmt.Errorf("%v", errT)
+		msg := MessagePage{
+				Header: "Failed to Process Item",
+				Message: template.HTML(
+						"<p>Item ID was not provided or was invalid!</p>",
+				),
+		}
+		errT.Execute(w, msg)
+		return
+	}
+	if item != nil {
+		strFooter := "<a href=\"/item?id=" + itemID + "\">Cancel Edit</a>"
+		fields := AddEditPageFields {
+			UserName:	s.CAttr("UserName").(string),
+			Header:		"Edit Item #" + itemID,
+			Info:		item,
+			InvEntries:	invEntries,
+			Footer:		template.HTML(strFooter),
+		}
+		t.Execute(w, fields)
+	} else {
+		strFooter := "<a href=\"/view\">Cancel</a>"
+		intItemID, _ := strconv.Atoi(itemID)
+		fields := AddEditPageFields {
+			UserName:	s.CAttr("UserName").(string),
+			Header:		"Add Item #" + itemID,
+			Info:		&Item{ItemID: intItemID},
+			InvEntries:	make([]InventoryEntry, 0),
+			Footer:		template.HTML(strFooter),
+		}
+		t.Execute(w, fields)
+	}
+}
+
+func CommitItemPage(w http.ResponseWriter, r *http.Request) {
+	s := session.Get(r)
+	if s == nil {
+		http.Redirect(w, r, "./login", 301)
+		return
+	}
+	if r.Method == "POST" {
+		itemID := r.FormValue("id")
+		intItemID, err1 := strconv.Atoi(itemID)
+		floatPrice, err2 := strconv.ParseFloat(r.FormValue("unitprice"), 32)
+		if err1 != nil || err2 != nil {
+			errT, _ := template.ParseFiles("message.gtpl")
+			msg := MessagePage{
+					Header: "Failed to Process Item",
+					Message: template.HTML(
+							"<p>Invalid Field Values</p>",
+					),
+			}
+			errT.Execute(w, msg)
+		}		
+		var item Item
+		item.ItemID = intItemID
+		item.Model_number = r.FormValue("model")
+		item.Manufacturer = r.FormValue("manufacturer")
+		item.Type = r.FormValue("type")
+		item.Subtype = r.FormValue("subtype")
+		item.Descriptive_name = r.FormValue("description")
+		item.Phys_description = r.FormValue("phys_description")
+		item.ProductURL = r.FormValue("productURL")
+		item.DatasheetURL = r.FormValue("datasheetURL")
+		item.Seller1URL = r.FormValue("seller1URL")
+		item.Seller2URL = r.FormValue("seller2URL")
+		item.Seller3URL = r.FormValue("seller3URL")
+		item.UnitPrice = floatPrice
+		item.Notes = r.FormValue("notes")
+		err := addUpdateItem(item)
+		if err != nil {
+			errT, _ := template.ParseFiles("message.gtpl")
+			msg := MessagePage{
+					Header: "Failed to Process Item",
+					Message: template.HTML(
+							"<p>Error: " + err.Error() + "</p>",
+					),
+			}
+			errT.Execute(w, msg)
+		} else {
+			http.Redirect(w, r, "./item?id=" + itemID, 301)			
+		}
+	}
 }
 
 func QtyPostHandler(w http.ResponseWriter, r *http.Request) {
@@ -182,7 +341,106 @@ func QtyPostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "POST" {
-	
+		itemID := r.FormValue("id")
+		location := r.FormValue("location")
+		quantity := r.FormValue("quantity")
+		err := updateInventory(itemID, location, quantity)
+		if err != nil {
+			errT, _ := template.ParseFiles("message.gtpl")
+			msg := MessagePage{
+					Header: "Failed to Process Item",
+					Message: template.HTML(
+							"<p>Error: " + err.Error() + "</p>",
+					),
+			}
+			errT.Execute(w, msg)
+		} else {
+			http.Redirect(w, r, "./item?id=" + itemID, 301)			
+		}
+	}
+}
+
+func DeleteEntryPage(w http.ResponseWriter, r *http.Request) {
+	s := session.Get(r)
+	if s == nil {
+		http.Redirect(w, r, "./login", 301)
+		return
+	}
+	var itemID string
+	var location string
+	if r.Method == "GET" {
+		itemID = r.URL.Query().Get("id")
+		location = r.URL.Query().Get("location")
+	} else {
+		itemID = r.FormValue("id")
+		location = r.FormValue("location")
+	}
+	fmt.Println("itemID =", itemID, "location =", location)
+	if itemID == "" || location == "" {
+		t, _ := template.ParseFiles("message.gtpl")
+		msg := MessagePage{
+				Header: "Missing Fields",
+				Message: template.HTML(
+						"<p>Some fields missing</p>",
+				),
+		}
+		t.Execute(w, msg)
+	} else {
+		err := deleteInventoryEntry(itemID, location)
+		if err != nil {
+			errT, _ := template.ParseFiles("message.gtpl")
+			msg := MessagePage{
+					Header: "Failed to Process Item",
+					Message: template.HTML(
+							"<p>Error: " + err.Error() + "</p>",
+					),
+			}
+			errT.Execute(w, msg)
+		} else {
+			http.Redirect(w, r, "./item?id=" + itemID, 301)
+		}
+	}
+}
+
+func AddEntryPage(w http.ResponseWriter, r *http.Request) {
+	s := session.Get(r)
+	if s == nil {
+		http.Redirect(w, r, "./login", 301)
+		return
+	}
+	var itemID string
+	var location string
+	if r.Method == "GET" {
+		itemID = r.URL.Query().Get("id")
+		location = r.URL.Query().Get("location")
+	} else {
+		itemID = r.FormValue("id")
+		location = r.FormValue("location")
+	}
+	fmt.Println("itemID =", itemID, "location =", location)
+	if itemID == "" || location == "" {
+		t, _ := template.ParseFiles("message.gtpl")
+		msg := MessagePage{
+				Header: "Missing Fields",
+				Message: template.HTML(
+						"<p>Some fields missing</p>",
+				),
+		}
+		t.Execute(w, msg)
+	} else {
+		err := addInventoryEntry(itemID, location, "0")
+		if err != nil {
+			errT, _ := template.ParseFiles("message.gtpl")
+			msg := MessagePage{
+					Header: "Failed to Process Item",
+					Message: template.HTML(
+							"<p>Error: " + err.Error() + "</p>",
+					),
+			}
+			errT.Execute(w, msg)
+		} else {
+			http.Redirect(w, r, "./item?id=" + itemID, 301)
+		}
 	}
 }
 
@@ -247,8 +505,12 @@ func main() {
 		http.HandleFunc("/view", ViewPage)
 		http.HandleFunc("/logout", LogoutPage)
 		http.HandleFunc("/item", ItemPage)
-		http.HandleFunc("/new", NewItemPage)
+		http.HandleFunc("/edit", AddEditItemPage)
+		http.HandleFunc("/delete", DeletePage)
+		http.HandleFunc("/commit", CommitItemPage)
 		http.HandleFunc("/modify-qty", QtyPostHandler)
+		http.HandleFunc("/delete-entry", DeleteEntryPage)
+		http.HandleFunc("/add-entry", AddEntryPage)
 		fmt.Println("Loading users data from '" + os.Args[2] + "'...")
 		users = netutil.NewUsers()
 		err := users.LoadFromFile(os.Args[2])

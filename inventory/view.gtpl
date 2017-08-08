@@ -70,7 +70,16 @@
 		table.apitable {
 			border: 0px;
 		}
-
+		form {
+		  width: 600px;
+		}
+		label {
+		  display: inline-block;
+		  width: 140px;
+		}
+		input {
+		  display: inline-block;
+		}
 
 	</style>
     <title>BBI Inventory System</title>
@@ -79,14 +88,20 @@
 		<div class="container">
 			<p class="centered">Welcome, {{.UserName}}! [<a href="./logout">Logout</a>]</p>
 			<h2>{{.ViewTitle}}</h2>
-			<p><a href="./view">View All</a> - <a href="./new">New Item</a></p>
+			<p>{{.ViewOps}}</p>
+			<p>
+			<form action="/item" method="post">
+				<label for="one">View Item ID:</label><input id="one" size="20" type="text" name="id">
+				<input type="submit" value="View / Add">
+			</form>
+			</p>
 			<table width="100%">
 			<tr>
 			<th>Item ID</th>
 			<th>Type</th>
 			<th>Model#</th>
 			<th>Description</th>
-			<th>Total</th>
+			<th>Total Qty</th>
 			</tr>
 			{{range .Data}}
 			<tr>

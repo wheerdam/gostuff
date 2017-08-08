@@ -71,7 +71,18 @@
 			border: 0px;
 		}
 
-
+		form {
+		  width: 100%;
+		}
+		label {
+		  display: inline-block;
+		  width: 150;
+		  margin: 0px;
+		}
+		input {
+		  display: inline-block;
+		  margin: 0px;
+		}
 	</style>
     <title>BBI Inventory System</title>
     </head>
@@ -79,7 +90,8 @@
 		<div class="container">
 			<p class="centered">Welcome, {{.UserName}}! [<a href="./logout">Logout</a>]</p>
 			<h2>Item #{{.Info.ItemID}}</h2>
-			<p><a href="./view">View All</a> - <a href="./edit?id={{.Info.ItemID}}">Edit this Item</a></p>
+			<p><a href="./view">View All</a> - <a href="./edit?id={{.Info.ItemID}}">Edit this Item</a>
+			- <a href="./delete?id={{.Info.ItemID}}">Delete this Item</a></p>
 			<table width="100%">
 			<tr><td>Model#</td><td>{{.Info.Model_number}}</td></tr>
 			<tr><td>Manufacturer</td><td><a href="./view?manufacturer={{.Info.Manufacturer}}">{{.Info.Manufacturer}}</a></td></tr>
@@ -99,13 +111,18 @@
 			<h2>Inventory Details:</h2>
 			<table width="100%">
 			<tr>
+			<th>Item ID</th>
 			<th>Location</th>
 			<th>Quantity</th>
 			</tr>
 			{{range .InvEntries}}
 			<tr>
-			<td>{{.Location}}</td>
-			<td>{{.Quantity}}</td>
+			<form action="/modify-qty" method="post">
+			<td><input size="10" tyle="text" name="id" readonly="readonly" value="{{.ItemID}}"></td>
+			<td><input size="30" type="text" name="location" readonly="readonly" value="{{.Location}}"></td>
+			<td><input size="10" type="text" name="quantity" value="{{.Quantity}}">
+			<input type="submit" value="Update"></td>
+			</form>
 			</tr>
 			{{end}}
 			</table>

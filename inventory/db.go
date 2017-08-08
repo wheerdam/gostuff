@@ -41,6 +41,106 @@ type FetchFilter struct {
 	value	string
 }
 
+func updateInventory(itemID string, location string, qty string) (error) {
+	stmt, err := db.Prepare("update inventory set " +
+		"quantity=$1 where (itemID=$2 and location=$3)")
+	if err != nil {
+		fmt.Println("Inventory Update Failed")
+		return err
+	}
+	_, err = stmt.Exec(qty, itemID, location)
+	return err
+}
+
+func addInventoryEntry(itemID string, location string, qty string) (error) {
+	stmt, err := db.Prepare("insert into inventory (" +
+		"itemID, location, quantity) values ($1, $2, $3)")
+	if err != nil {
+		fmt.Println("Add Inventory Entry Failed")
+		return err
+	}
+	_, err = stmt.Exec(itemID, location, qty)
+	return err
+}
+
+func deleteInventoryEntry(itemID string, location string) (error) {
+	stmt, err := db.Prepare("delete from inventory where (" +
+		"itemID=$1 and location=$2)")
+	if err != nil {
+		return err
+	}
+	_, err = stmt.Exec(itemID, location)
+	return err
+}
+
+func deleteAllItemEntries(itemID string) (error) {
+	stmt, err := db.Prepare("delete from inventory where itemID=$1")
+	if err != nil {
+		return err
+	}
+	_, err = stmt.Exec(itemID)
+	return err
+}
+
+func addUpdateItem(item Item) (error) {
+	query := "select count(*) from items where itemID=" + 
+		strconv.Itoa(item.ItemID)
+	var rows int
+	err := db.QueryRow(query).Scan(&rows)
+	if err != nil {
+		return err
+	}
+	fmt.Println("rows scan returns", rows, "for id =", 
+		strconv.Itoa(item.ItemID))
+	var queryStr string
+	if rows == 0 {
+		queryStr = "insert into items(" +
+			"itemID, descriptive_name, model_number, manufacturer, " +
+			"type, subtype, " +
+			"phys_description, datasheetURL, productURL, seller1URL, " +
+			"seller2URL, seller3URL, unitPrice, notes) values ( " +
+			"$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, " +
+			"$13, $14)"
+	} else {
+		queryStr = "update items set " +
+			"itemID=$1, descriptive_name=$2, model_number=$3, " +
+			"manufacturer=$4, type=$5, subtype=$6, " +
+			"phys_description=$7, datasheetURL=$8, productURL=$9, " +
+			"seller1URL=$10, seller2URL=$11, seller3URL=$12, " +
+			"unitPrice=$13, notes=$14 " +
+			"where itemID=$1"
+		fmt.Println(queryStr)
+	}
+	stmt, err := db.Prepare(queryStr)
+	if err != nil {
+		fmt.Println("Add Item failed on db.Prepare")
+		return err
+	}
+	_, err = stmt.Exec(
+			strconv.Itoa(item.ItemID), item.Descriptive_name, item.Model_number,
+			item.Manufacturer, item.Type, item.Subtype,
+			item.Phys_description, item.DatasheetURL,
+			item.ProductURL, item.Seller1URL, item.Seller2URL,
+			item.Seller3URL, item.UnitPrice, item.Notes)
+	if err != nil {
+		fmt.Println("Add Item failed on stmt.Exec")
+		return err
+	}
+	return nil
+}
+
+func deleteItem(itemID string) (error) {
+	stmt, err := db.Prepare("delete from items where itemID=$1")
+	if err != nil {
+		return err
+	}
+	_, err = stmt.Exec(itemID)
+	if err != nil {
+		return err
+	}
+	return deleteAllItemEntries(itemID)
+}
+
 func getItem(itemID string) (*Item, []InventoryEntry, error) {
 	var count int
 	rows, err := db.Query("select * from items where itemID=$1", itemID)	
@@ -76,21 +176,25 @@ func getItem(itemID string) (*Item, []InventoryEntry, error) {
 }
 
 func getItems() []Item {
-	return getItemsFiltered()
+	return getItemsFiltered(false)
 }
 
-func getItemsFiltered(filters...FetchFilter) []Item {
+func getItemsFiltered(or bool, filters...FetchFilter) []Item {
 	var count int
 	values := make([]interface{}, len(filters))
 	stmt := "select * from items"
+	logicOp := " and "
+	if or {
+		logicOp = " or "
+	}
 	if filters != nil {
 		stmt = stmt + " where ("
 		for i := range filters {
 			count := strconv.Itoa(i+1)
-			stmt = stmt + filters[i].key + "=$" + count + " and "
+			stmt = stmt + filters[i].key + "=$" + count + logicOp
 			values[i] = filters[i].value
 		}
-		stmt = strings.TrimRight(stmt, " and ")
+		stmt = strings.TrimRight(stmt, logicOp)
 		stmt = stmt + ")"
 	}
 	rows, err := db.Query(stmt, values...)	
@@ -132,7 +236,7 @@ func getInventoryEntries(id int) []InventoryEntry {
 	itemID := strconv.Itoa(id)
 	list := make([]InventoryEntry, 0)
 	invrows, err := db.Query("select * from inventory where " +
-		"itemID=" + itemID)
+		"itemID=$1", itemID)
 	if err != nil {
 		fmt.Println(err)
 		return nil
