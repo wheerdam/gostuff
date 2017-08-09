@@ -6,7 +6,7 @@
     </head>
     <body>
 		<div class="container">
-			<img style="float:right" src="./static/logo.png">
+			<img style="float:right" src="./static/logo.png" height="80px">
 			<hr>
 			<h2>{{.Header}}</h2>
 			{{.Message}}

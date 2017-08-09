@@ -6,11 +6,14 @@
     </head>
     <body>
 		<div class="container">
-			<img style="float:right" src="./static/logo.png">			
+			<img style="float:right" src="./static/logo.png" height="80px">			
 			<p class="centered">Welcome, {{.UserName}}! [<a href="./logout">Logout</a>]</p>
 			<hr>
 			<h2>{{.Header}}</h2>
 			<form action="/commit" method="post">
+			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
+				<p><input type="submit" value="Commit"> {{.Footer}}</p>
+				</div>
 				<p><label for="id">ID#</label><input id="id" size="60" type="text" name="id" readonly="readonly" value="{{.Info.ItemID}}"></p>
 				<p><label for="model">Model#:</label><input id="model" size="60" type="text" name="model" value="{{.Info.Model_number}}"></p>
 				<p><label for="mfct">Manufacturer:</label><input id="mfct" size="60" type="text" name="manufacturer" value="{{.Info.Manufacturer}}"></p>
@@ -25,10 +28,18 @@
 				<p><label for="seller3url">Seller 3 Link:</label><input id="seller3url" size="60" type="text" name="seller3URL" value="{{.Info.Seller3URL}}"></p>
 				<p><label for="price">Unit Price:</label><input id="price" size="60" type="text" name="unitprice" value="{{.Info.UnitPrice}}"></p>
 				<p><label for="notes">Notes:</label><input id="notes" size="60" type="text" name="notes" value="{{.Info.Notes}}"></p>
-				<p><input type="submit" value="Commit"> {{.Footer}}</p>
+				
 			</form>
 			</table>
-			<h2>Current Inventory Locations:</h2>
+			<h2>Inventory Locations:</h2>
+			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
+			<form action="/add-entry" method="post">
+				<p><input size="10" type="text" readonly="readonly" name="id" value="{{.Info.ItemID}}"></p>
+				<p><label for="location">Add a Location:</label><input id="location" size="60" type="text" name="location">
+				<input type="submit" value="Add"></p>
+				</p>
+			</form>
+			</div>
 			<table width="100%">
 			{{range .InvEntries}}
 			<form action="/delete-entry" method="post">
@@ -40,12 +51,7 @@
 			</form>
 			{{end}}
 			</table>
-			<form action="/add-entry" method="post">
-				<p><input size="10" type="text" readonly="readonly" name="id" value="{{.Info.ItemID}}"></p>
-				<p><label for="location">Add a Location:</label><input id="location" size="60" type="text" name="location">
-				<input type="submit" value="Add"></p>
-				</p>
-			</form>
+			
 		</div>
     </body>
 </html>

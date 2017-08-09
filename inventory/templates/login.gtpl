@@ -6,7 +6,8 @@
     </head>
     <body>
 		<div class="container">
-			<img style="float:right" src="./static/logo.png">
+			<img style="float:right" src="./static/logo.png" height="80px">
+			<p>You must login to continue</p>
 			<hr>
 			<form action="/login" method="post">
 				<p><label for="one">Username:</label><input id="one" size="20" type="text" name="username"></p>

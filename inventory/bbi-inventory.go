@@ -125,9 +125,9 @@ func ViewPage(w http.ResponseWriter, r *http.Request) {
 					}
 				}				
 			}
-			items = getItemsFiltered(logicOr, filters...)
+			items = getItemsFiltered("type", logicOr, filters...)
 		} else {
-			items = getItems()
+			items = getItems("type")
 		}
 		types, _ := getDistinctCol("type")
 		manufacturers, _ := getDistinctCol("manufacturer")
@@ -267,7 +267,7 @@ func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if item != nil {
-		strFooter := "<a href=\"/item?id=" + itemID + "\">Cancel Edit</a>"
+		strFooter := " - <a href=\"/item?id=" + itemID + "\">Cancel Edit</a>"
 		fields := AddEditPageFields {
 			UserName:	s.CAttr("UserName").(string),
 			Header:		"Edit Item #" + itemID,
@@ -277,7 +277,7 @@ func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
 		}
 		t.Execute(w, fields)
 	} else {
-		strFooter := "<a href=\"/view\">Cancel</a>"
+		strFooter := " - <a href=\"/view\">Cancel</a>"
 		intItemID, _ := strconv.Atoi(itemID)
 		fields := AddEditPageFields {
 			UserName:	s.CAttr("UserName").(string),

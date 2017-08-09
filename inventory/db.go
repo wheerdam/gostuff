@@ -191,11 +191,11 @@ func getItem(itemID string) (*Item, []InventoryEntry, error) {
 	return nil, nil, nil
 }
 
-func getItems() []Item {
-	return getItemsFiltered(false)
+func getItems(order string) []Item {
+	return getItemsFiltered(order, false)
 }
 
-func getItemsFiltered(or bool, filters...FetchFilter) []Item {
+func getItemsFiltered(order string, or bool, filters...FetchFilter) []Item {
 	values := make([]interface{}, len(filters))
 	stmt := "select * from items"
 	logicOp := " and "
@@ -212,7 +212,7 @@ func getItemsFiltered(or bool, filters...FetchFilter) []Item {
 		stmt = strings.TrimRight(stmt, logicOp)
 		stmt = stmt + ")"
 	}
-	stmt = stmt + " order by itemID"
+	stmt = stmt + " order by " + order
 	rows, err := db.Query(stmt, values...)	
 	if err != nil {
 		fmt.Println(err)

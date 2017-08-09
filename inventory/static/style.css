@@ -77,3 +77,20 @@ label {
 input {
   display: inline-block;
 }
+
+span.mono {
+	font-family: monospace;
+	font-size: 10.5pt;
+	border: 1px solid #cfcfcf;
+	padding: 1px;
+}
+
+p.mono {
+    font-family: monospace;
+    font-size: 10.5pt;
+    margin-left: 15px;
+}
+
+p {
+	margin: 5px;
+}

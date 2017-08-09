@@ -6,12 +6,14 @@
     </head>
     <body>
 		<div class="container">
-			<img style="float:right" src="./static/logo.png">			
+			<img style="float:right" src="./static/logo.png" height="80px">			
 			<p class="centered">Welcome, {{.UserName}}! [<a href="./logout">Logout</a>]</p>
 			<hr>
 			<h2>Item #{{.Info.ItemID}}</h2>
+			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
 			<p><a href="./view">View All</a> - <a href="./edit?id={{.Info.ItemID}}">Edit this Item</a>
 			- <a href="./delete?id={{.Info.ItemID}}">Delete this Item</a></p>
+			</div>
 			<table width="100%">
 			<tr><td>Model#</td><td>{{.Info.Model_number}}</td></tr>
 			<tr><td>Manufacturer</td><td><a href="./view?manufacturer={{.Info.Manufacturer}}">{{.Info.Manufacturer}}</a></td></tr>
