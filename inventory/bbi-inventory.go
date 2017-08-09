@@ -43,7 +43,7 @@ type MessagePage struct {
 
 func LoginPage(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-        t, _ := template.ParseFiles("login.gtpl")
+        t, _ := template.ParseFiles("templates/login.gtpl")
         t.Execute(w, nil)
     } else {
         r.ParseForm()
@@ -51,7 +51,7 @@ func LoginPage(w http.ResponseWriter, r *http.Request) {
 		userName := r.FormValue("username")
 		err := users.Login(userName, r.FormValue("password"))
 		if err != nil {
-			t, _ := template.ParseFiles("message.gtpl")
+			t, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
 					Header: "Login Failed",
 					Message: template.HTML(
@@ -78,7 +78,7 @@ func LoginPage(w http.ResponseWriter, r *http.Request) {
 func LogoutPage(w http.ResponseWriter, r *http.Request) {
 	s := session.Get(r)
 	if s == nil {
-		t, _ := template.ParseFiles("message.gtpl")
+		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
 				Header:	"Logout Failed",
 				Message: template.HTML(
@@ -89,7 +89,7 @@ func LogoutPage(w http.ResponseWriter, r *http.Request) {
 		t.Execute(w, msg)
 	} else {
 		session.Remove(s, w)
-		t, _ := template.ParseFiles("message.gtpl")
+		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
 				Header: "Logged Out",
 				Message: template.HTML(
@@ -105,7 +105,7 @@ func ViewPage(w http.ResponseWriter, r *http.Request) {
 	if s == nil {
 		http.Redirect(w, r, "./login", 301)
 	} else {
-		t, _ := template.ParseFiles("view.gtpl")
+		t, _ := template.ParseFiles("templates/view.gtpl")
 		userName := s.CAttr("UserName")
 		viewOps := ""
 		logicOr := false
@@ -161,7 +161,7 @@ func ItemPage(w http.ResponseWriter, r *http.Request) {
 		itemID = r.FormValue("id")
 	}
 	if itemID == "" {
-		t, _ := template.ParseFiles("message.gtpl")
+		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
 				Header: "Missing Item ID",
 				Message: template.HTML(
@@ -170,16 +170,17 @@ func ItemPage(w http.ResponseWriter, r *http.Request) {
 		}
 		t.Execute(w, msg)
 	} else {
-		t, _ := template.ParseFiles("item.gtpl")
+		t, _ := template.ParseFiles("templates/item.gtpl")
 		item, invEntries, err := getItem(itemID)
 		if item == nil || err != nil {
-			errT, _ := template.ParseFiles("message.gtpl")
+			errT, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
 					Header: "Failed to Process Item",
 					Message: template.HTML(
 							"<p>ItemID: " + itemID + "</p>" +
 							"<p><a href=\"./edit?id=" + itemID + 
-							"\">Add/Edit Item</a></p>",
+							"\">Add this Item</a> - " + 
+							"<a href=\"./view\">Cancel</a></p>",
 					),
 			}
 			errT.Execute(w, msg)
@@ -208,7 +209,7 @@ func DeletePage(w http.ResponseWriter, r *http.Request) {
 		itemID = r.FormValue("id")
 	}
 	if itemID == "" {
-		t, _ := template.ParseFiles("message.gtpl")
+		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
 				Header: "Missing Item ID",
 				Message: template.HTML(
@@ -219,7 +220,7 @@ func DeletePage(w http.ResponseWriter, r *http.Request) {
 	} else {
 		err := deleteItem(itemID)
 		if err != nil {
-			errT, _ := template.ParseFiles("message.gtpl")
+			errT, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
 					Header: "Failed to Process Item",
 					Message: template.HTML(
@@ -245,10 +246,10 @@ func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
 	} else {
 		itemID = r.FormValue("id")
 	}
-	t, _ := template.ParseFiles("edit.gtpl")
+	t, _ := template.ParseFiles("templates/edit.gtpl")
 	item, invEntries, err := getItem(itemID)
 	if itemID == "" || err != nil {
-		errT, _ := template.ParseFiles("message.gtpl")
+		errT, _ := template.ParseFiles("templates/message.gtpl")
 		// errStr := fmt.Errorf("%v", errT)
 		msg := MessagePage{
 				Header: "Failed to Process Item",
@@ -294,7 +295,7 @@ func CommitItemPage(w http.ResponseWriter, r *http.Request) {
 		intItemID, err1 := strconv.Atoi(itemID)
 		floatPrice, err2 := strconv.ParseFloat(r.FormValue("unitprice"), 32)
 		if err1 != nil || err2 != nil {
-			errT, _ := template.ParseFiles("message.gtpl")
+			errT, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
 					Header: "Failed to Process Item",
 					Message: template.HTML(
@@ -320,7 +321,7 @@ func CommitItemPage(w http.ResponseWriter, r *http.Request) {
 		item.Notes = r.FormValue("notes")
 		err := addUpdateItem(item)
 		if err != nil {
-			errT, _ := template.ParseFiles("message.gtpl")
+			errT, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
 					Header: "Failed to Process Item",
 					Message: template.HTML(
@@ -346,7 +347,7 @@ func QtyPostHandler(w http.ResponseWriter, r *http.Request) {
 		quantity := r.FormValue("quantity")
 		err := updateInventory(itemID, location, quantity)
 		if err != nil {
-			errT, _ := template.ParseFiles("message.gtpl")
+			errT, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
 					Header: "Failed to Process Item",
 					Message: template.HTML(
@@ -377,7 +378,7 @@ func DeleteEntryPage(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Println("itemID =", itemID, "location =", location)
 	if itemID == "" || location == "" {
-		t, _ := template.ParseFiles("message.gtpl")
+		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
 				Header: "Missing Fields",
 				Message: template.HTML(
@@ -388,7 +389,7 @@ func DeleteEntryPage(w http.ResponseWriter, r *http.Request) {
 	} else {
 		err := deleteInventoryEntry(itemID, location)
 		if err != nil {
-			errT, _ := template.ParseFiles("message.gtpl")
+			errT, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
 					Header: "Failed to Process Item",
 					Message: template.HTML(
@@ -419,7 +420,7 @@ func AddEntryPage(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Println("itemID =", itemID, "location =", location)
 	if itemID == "" || location == "" {
-		t, _ := template.ParseFiles("message.gtpl")
+		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
 				Header: "Missing Fields",
 				Message: template.HTML(
@@ -430,7 +431,7 @@ func AddEntryPage(w http.ResponseWriter, r *http.Request) {
 	} else {
 		err := addInventoryEntry(itemID, location, "0")
 		if err != nil {
-			errT, _ := template.ParseFiles("message.gtpl")
+			errT, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
 					Header: "Failed to Process Item",
 					Message: template.HTML(
@@ -463,7 +464,7 @@ func usersUsage() {
 }
 
 func serveUsage() {
-	fmt.Println("  serve [users-file] [db-config] [cert] [key]")
+	fmt.Println("  serve [users-file] [db-config] [cert] [key] [static-dir]")
 }
 
 func dbUsage() {
@@ -497,7 +498,7 @@ func main() {
 		}
 		handleDbOps()
 	case "serve":
-		if len(os.Args) != 6 {
+		if len(os.Args) != 7 {
 			serveUsage()
 			return
 		}
@@ -511,6 +512,8 @@ func main() {
 		http.HandleFunc("/modify-qty", QtyPostHandler)
 		http.HandleFunc("/delete-entry", DeleteEntryPage)
 		http.HandleFunc("/add-entry", AddEntryPage)
+		fs := http.FileServer(http.Dir(os.Args[6]))
+		http.Handle("/static/", http.StripPrefix("/static/", fs))
 		fmt.Println("Loading users data from '" + os.Args[2] + "'...")
 		users = netutil.NewUsers()
 		err := users.LoadFromFile(os.Args[2])

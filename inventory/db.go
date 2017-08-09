@@ -197,6 +197,7 @@ func getItemsFiltered(or bool, filters...FetchFilter) []Item {
 		stmt = strings.TrimRight(stmt, logicOp)
 		stmt = stmt + ")"
 	}
+	stmt = stmt + " order by itemID"
 	rows, err := db.Query(stmt, values...)	
 	if err != nil {
 		fmt.Println(err)
@@ -236,7 +237,7 @@ func getInventoryEntries(id int) []InventoryEntry {
 	itemID := strconv.Itoa(id)
 	list := make([]InventoryEntry, 0)
 	invrows, err := db.Query("select * from inventory where " +
-		"itemID=$1", itemID)
+		"itemID=$1 order by location asc", itemID)
 	if err != nil {
 		fmt.Println(err)
 		return nil
