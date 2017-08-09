@@ -16,10 +16,12 @@ var users *netutil.Users
 var db *sql.DB
 
 type ViewPageFields struct {
-	UserName 	string
-	ViewTitle	string
-	ViewOps		interface{}
-	Data 		[]Item
+	UserName 		string
+	ViewTitle		string
+	Types			[]string
+	Manufacturers	[]string
+	ViewOps			interface{}
+	Data 			[]Item
 }
 
 type ItemPageFields struct {
@@ -127,10 +129,14 @@ func ViewPage(w http.ResponseWriter, r *http.Request) {
 		} else {
 			items = getItems()
 		}
+		types, _ := getDistinctCol("type")
+		manufacturers, _ := getDistinctCol("manufacturer")
 		viewData := ViewPageFields{
-				UserName: userName.(string),
-				ViewTitle: "View Items",
-				Data: items,
+				UserName: 		userName.(string),
+				ViewTitle:		"View Items",
+				Data: 			items,
+				Types:			types,
+				Manufacturers:	manufacturers,
 		}
 		if viewOps != ""  {
 			if logicOr {

@@ -109,7 +109,6 @@ func addUpdateItem(item Item) (error) {
 			"seller1URL=$10, seller2URL=$11, seller3URL=$12, " +
 			"unitPrice=$13, notes=$14 " +
 			"where itemID=$1"
-		fmt.Println(queryStr)
 	}
 	stmt, err := db.Prepare(queryStr)
 	if err != nil {
@@ -141,13 +140,30 @@ func deleteItem(itemID string) (error) {
 	return deleteAllItemEntries(itemID)
 }
 
+func getDistinctCol(colName string) ([]string, error) {
+	rows, err := db.Query("select distinct " + colName + " from items " +
+		" order by " + colName + " asc")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	values := make([]string, 0)
+	for rows.Next() {
+		var value string
+		err = rows.Scan(&value)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, value)
+	}
+	return values, nil
+}
+
 func getItem(itemID string) (*Item, []InventoryEntry, error) {
-	var count int
 	rows, err := db.Query("select * from items where itemID=$1", itemID)	
 	if err != nil {
 		return nil, nil, err
 	}
-	rows.Scan(&count)
 	defer rows.Close()
 	for rows.Next() {
 		var item Item
@@ -180,7 +196,6 @@ func getItems() []Item {
 }
 
 func getItemsFiltered(or bool, filters...FetchFilter) []Item {
-	var count int
 	values := make([]interface{}, len(filters))
 	stmt := "select * from items"
 	logicOp := " and "
@@ -203,8 +218,7 @@ func getItemsFiltered(or bool, filters...FetchFilter) []Item {
 		fmt.Println(err)
 		return nil
 	}
-	rows.Scan(&count)
-	list := make([]Item, count)
+	list := make([]Item, 0)
 	defer rows.Close()
 	for rows.Next() {
 		var item Item

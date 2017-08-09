@@ -17,6 +17,16 @@
 				<input type="submit" value="View / Add">
 			</form>
 			</p>
+			<p>Types:
+			{{range $str := .Types}}
+			<a href="./view?type={{$str}}">{{$str}}</a> -
+			{{end}}
+			</p>
+			<p>Manufacturers:
+			{{range $str := .Manufacturers}}
+			<a href="./view?manufacturer={{$str}}">{{$str}}</a> -
+			{{end}}
+			</p>
 			<table width="100%">
 			<tr>
 			<th>Item ID</th>
