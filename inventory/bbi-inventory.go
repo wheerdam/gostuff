@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"strconv"
 	"net/http"
 	"html/template"
@@ -43,6 +44,18 @@ type MessagePage struct {
 	Message interface{}
 }
 
+type BrowsePageFields struct {
+	UserName		string
+	Types			[]Type
+	Manufacturers	[]string
+}
+
+type Type struct {
+	Name			string
+	Subtypes		[]string
+	Manufacturers	[]string
+}
+
 func LoginPage(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
         t, _ := template.ParseFiles("templates/login.gtpl")
@@ -72,7 +85,7 @@ func LoginPage(w http.ResponseWriter, r *http.Request) {
 					CAttrs: map[string]interface{}{"UserName": userName},
 			})
 			session.Add(s, w)
-			http.Redirect(w, r, "./view", 301)
+			http.Redirect(w, r, "./browse", 301)
 		}
     }
 }
@@ -121,9 +134,20 @@ func ViewPage(w http.ResponseWriter, r *http.Request) {
 					} else {
 						filter := FetchFilter{key: k, value: v[i]}
 						filters = append(filters, filter)
-						viewOps = viewOps + " '" + k + "=" + v[i] + "'"
+						viewOps = viewOps + " <span style=\"color:#ababab\">" + k + "=</span>'" +
+							v[i] + "'"
+						if logicOr {
+							viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
+						} else {
+							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
+						}
 					}
 				}				
+			}
+			if logicOr {
+				viewOps = strings.TrimRight(viewOps, " <span style=\"color:#2222ff\">or</span>")
+			} else {
+				viewOps = strings.TrimRight(viewOps, " <span style=\"color:#2222ff\">and</span>")
 			}
 			items = getItemsFiltered("type", logicOr, filters...)
 		} else {
@@ -138,16 +162,10 @@ func ViewPage(w http.ResponseWriter, r *http.Request) {
 				Types:			types,
 				Manufacturers:	manufacturers,
 		}
-		if viewOps != ""  {
-			if logicOr {
-				viewOps = "OR = " + viewOps
-			} else {
-				viewOps = "AND = " + viewOps
-			}
-			viewData.ViewOps = template.HTML(
-				"<a href=\"./view\">View All Items</a> - " + viewOps)
+		if viewOps != "" {
+			viewData.ViewOps = template.HTML(viewOps)
 		} else {
-			viewData.ViewOps = "Viewing All Items"
+			viewData.ViewOps = "All Items"
 		}
 		
 		t.Execute(w, viewData)
@@ -186,7 +204,7 @@ func ItemPage(w http.ResponseWriter, r *http.Request) {
 							"<p>ItemID: " + itemID + "</p>" +
 							"<p><a href=\"./edit?id=" + itemID + 
 							"\">Add this Item</a> - " + 
-							"<a href=\"./view\">Cancel</a></p>",
+							"<a href=\"./browse\">Browse</a> - <a href=\"./view\">View All Items</a></p>",
 					),
 			}
 			errT.Execute(w, msg)
@@ -202,7 +220,7 @@ func ItemPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func DeletePage(w http.ResponseWriter, r *http.Request) {
+func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	s := session.Get(r)
 	if s == nil {
 		http.Redirect(w, r, "./login", 301)
@@ -224,6 +242,7 @@ func DeletePage(w http.ResponseWriter, r *http.Request) {
 		}
 		t.Execute(w, msg)
 	} else {
+		item, _, _ := getItem(itemID)
 		err := deleteItem(itemID)
 		if err != nil {
 			errT, _ := template.ParseFiles("templates/message.gtpl")
@@ -235,7 +254,7 @@ func DeletePage(w http.ResponseWriter, r *http.Request) {
 			}
 			errT.Execute(w, msg)
 		} else {
-			http.Redirect(w, r, "./view", 301)
+			http.Redirect(w, r, "./view?type=" + item.Type, 301)
 		}
 	}
 }
@@ -256,7 +275,6 @@ func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
 	item, invEntries, err := getItem(itemID)
 	if itemID == "" || err != nil {
 		errT, _ := template.ParseFiles("templates/message.gtpl")
-		// errStr := fmt.Errorf("%v", errT)
 		msg := MessagePage{
 				Header: "Failed to Process Item",
 				Message: template.HTML(
@@ -267,7 +285,7 @@ func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if item != nil {
-		strFooter := " - <a href=\"/item?id=" + itemID + "\">Cancel Edit</a>"
+		strFooter := " <button onclick=\"history.back()\">Cancel</button>"
 		fields := AddEditPageFields {
 			UserName:	s.CAttr("UserName").(string),
 			Header:		"Edit Item #" + itemID,
@@ -277,7 +295,7 @@ func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
 		}
 		t.Execute(w, fields)
 	} else {
-		strFooter := " - <a href=\"/view\">Cancel</a>"
+		strFooter := " <button onclick=\"window.location.href='./browse'; return false\">Cancel</button>"
 		intItemID, _ := strconv.Atoi(itemID)
 		fields := AddEditPageFields {
 			UserName:	s.CAttr("UserName").(string),
@@ -290,7 +308,71 @@ func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func CommitItemPage(w http.ResponseWriter, r *http.Request) {
+func BrowsePage(w http.ResponseWriter, r *http.Request) {
+	s := session.Get(r)
+	if s == nil {
+		http.Redirect(w, r, "./login", 301)
+		return
+	}
+	userName := s.CAttr("UserName").(string)
+	types, err := getDistinctCol("type")	
+	if err != nil {
+		errT, _ := template.ParseFiles("templates/message.gtpl")
+		msg := MessagePage{
+				Header: "Failed to Get Item Types",
+				Message: template.HTML(
+						"<p>This should not happen, please contact the administrator</p>" +
+						"<p>Error: " + err.Error() + "</p>",
+				),
+		}
+		errT.Execute(w, msg)
+		return
+	}
+	manufacturers, err := getDistinctCol("manufacturer")
+	if err != nil {
+		errT, _ := template.ParseFiles("templates/message.gtpl")
+		msg := MessagePage{
+				Header: "Failed to Get Item Types",
+				Message: template.HTML(
+						"<p>This should not happen, please contact the administrator</p>" +
+						"<p>Error: " + err.Error() + "</p>",
+				),
+		}
+		errT.Execute(w, msg)
+		return
+	}
+	browsePageFields := BrowsePageFields{
+		UserName:		userName,
+		Types:			make([]Type, len(types)),
+		Manufacturers:	manufacturers,
+	}		
+	for i := range types {
+		condition := FetchFilter{
+			key: 	"type",
+			value:	types[i]}
+		subtypes, err := getDistinctCol("subtype", condition)
+		typeManufacturers, _ := getDistinctCol("manufacturer", condition)
+		if err != nil {
+			errT, _ := template.ParseFiles("templates/message.gtpl")
+			msg := MessagePage{
+					Header: "Failed to Get Subtypes",
+					Message: template.HTML(
+							"<p>This should not happen, please contact the administrator</p>" +
+							"<p>Error: " + err.Error() + "</p>",
+					),
+			}
+			errT.Execute(w, msg)
+		}
+		browsePageFields.Types[i].Name = types[i]
+		browsePageFields.Types[i].Subtypes = subtypes
+		browsePageFields.Types[i].Manufacturers = typeManufacturers
+	}
+	
+	t, _ := template.ParseFiles("templates/browse.gtpl")
+	t.Execute(w, browsePageFields)
+}
+
+func CommitItemHandler(w http.ResponseWriter, r *http.Request) {
 	s := session.Get(r)
 	if s == nil {
 		http.Redirect(w, r, "./login", 301)
@@ -298,9 +380,8 @@ func CommitItemPage(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == "POST" {
 		itemID := r.FormValue("id")
-		intItemID, err1 := strconv.Atoi(itemID)
-		floatPrice, err2 := strconv.ParseFloat(r.FormValue("unitprice"), 32)
-		if err1 != nil || err2 != nil {
+		intItemID, err := strconv.Atoi(itemID)
+		if err != nil {
 			errT, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
 					Header: "Failed to Process Item",
@@ -323,9 +404,10 @@ func CommitItemPage(w http.ResponseWriter, r *http.Request) {
 		item.Seller1URL = r.FormValue("seller1URL")
 		item.Seller2URL = r.FormValue("seller2URL")
 		item.Seller3URL = r.FormValue("seller3URL")
-		item.UnitPrice = floatPrice
+		item.UnitPrice = r.FormValue("unitprice")
 		item.Notes = r.FormValue("notes")
-		err := addUpdateItem(item)
+		item.Value = r.FormValue("value")
+		err = addUpdateItem(item)
 		if err != nil {
 			errT, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
@@ -367,7 +449,7 @@ func QtyPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func DeleteEntryPage(w http.ResponseWriter, r *http.Request) {
+func DeleteEntryHandler(w http.ResponseWriter, r *http.Request) {
 	s := session.Get(r)
 	if s == nil {
 		http.Redirect(w, r, "./login", 301)
@@ -409,7 +491,7 @@ func DeleteEntryPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func AddEntryPage(w http.ResponseWriter, r *http.Request) {
+func AddEntryHandler(w http.ResponseWriter, r *http.Request) {
 	s := session.Get(r)
 	if s == nil {
 		http.Redirect(w, r, "./login", 301)
@@ -448,6 +530,34 @@ func AddEntryPage(w http.ResponseWriter, r *http.Request) {
 		} else {
 			http.Redirect(w, r, "./item?id=" + itemID, 301)
 		}
+	}
+}
+
+func DownloadItemsHandler(w http.ResponseWriter, r *http.Request) {
+	s := session.Get(r)
+	if s == nil {
+		http.Redirect(w, r, "./login", 301)
+		return
+	}
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment;filename=items.csv")
+	err := exportItems(w)
+	if err != nil {
+		// oh wow
+	}
+}
+
+func DownloadInventoryHandler(w http.ResponseWriter, r *http.Request) {
+	s := session.Get(r)
+	if s == nil {
+		http.Redirect(w, r, "./login", 301)
+		return
+	}
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment;filename=inventory.csv")
+	err := exportInventory(w)
+	if err != nil {
+		// oh wow
 	}
 }
 
@@ -513,11 +623,14 @@ func main() {
 		http.HandleFunc("/logout", LogoutPage)
 		http.HandleFunc("/item", ItemPage)
 		http.HandleFunc("/edit", AddEditItemPage)
-		http.HandleFunc("/delete", DeletePage)
-		http.HandleFunc("/commit", CommitItemPage)
+		http.HandleFunc("/delete", DeleteHandler)
+		http.HandleFunc("/commit", CommitItemHandler)
 		http.HandleFunc("/modify-qty", QtyPostHandler)
-		http.HandleFunc("/delete-entry", DeleteEntryPage)
-		http.HandleFunc("/add-entry", AddEntryPage)
+		http.HandleFunc("/delete-entry", DeleteEntryHandler)
+		http.HandleFunc("/add-entry", AddEntryHandler)
+		http.HandleFunc("/download-items", DownloadItemsHandler)		
+		http.HandleFunc("/download-inventory", DownloadInventoryHandler)
+		http.HandleFunc("/browse", BrowsePage)
 		fs := http.FileServer(http.Dir(os.Args[6]))
 		http.Handle("/static/", http.StripPrefix("/static/", fs))
 		fmt.Println("Loading users data from '" + os.Args[2] + "'...")

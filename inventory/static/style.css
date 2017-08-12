@@ -18,7 +18,7 @@ div.container {
 	}
 
 	div.container {
-		width: 750px;
+		width: 100%;
 	}
 
 	img.optimized {
@@ -29,16 +29,17 @@ div.container {
 		width: 500px;
 	}
 
-	body {
+	
+}
+
+body {
 		font-size: 14px;
 	}
-}
 
 table, th, td {
 	border-collapse: collapse;
 	border: 1px solid black;
-	font-family: monospace;
-	font-size: 14px;
+	/*ont-family: monospace;*/
 	margin-bottom: 10px;
 }
 
@@ -46,9 +47,14 @@ th, td {
 	padding: 3px 3px 3px 3px;
 }
 
+td {
+	font-size: 10pt;	
+}
+
 th {
 	background-color: #cccccc;
 	text-align: center;
+	font-size: 9pt;
 }
 
 table.apitable td.a {
@@ -88,7 +94,7 @@ span.mono {
 p.mono {
     font-family: monospace;
     font-size: 10.5pt;
-    margin-left: 15px;
+    margin-left: 5px;
 }
 
 p {
