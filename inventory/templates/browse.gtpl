@@ -9,10 +9,19 @@
 			<img style="float:right" src="./static/logo.png" height="80px">			
 			<p>Welcome, {{.UserName}}! [<a href="./logout">Logout</a>] - CSV: <a href="./download-items">Items</a> - <a href="./download-inventory">Inventory</a></p>
 			<hr>
-			<h2>Browse</h2>
+			<h2 style="vertical-align: middle"><img src="./static/browse.png" height="30px" style="vertical-align: middle"> Browse</h2>
 			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
 			<p style="line-height: 175%">
-			<span style="color: #babaff">&#9656;</span><strong><a href="./view">LIST ALL</a></strong>&nbsp;
+			<span style="color: #babaff">&#9656;</span><strong><a href="./list">LIST ALL</a></strong>&nbsp;
+			</p>
+			</div>
+			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
+			<p>
+			<form action="/item" method="post" style="margin: 0px; padding: 0px">
+				<label for="one" style="margin-left: 5px; margin-right: 5px">View Item ID:</label>
+				<input id="one" size="20" type="text" name="id"  style="margin:0px">
+				<input type="submit" value="View / Add" style="margin:0px">
+			</form>
 			</p>
 			</div>
 			<div align="center">
@@ -26,7 +35,7 @@
 			<td style="padding-left: 10px; padding-right: 10px; vertical-align: top">
 			{{ range .Manufacturers }}
 				<p><span style="color: #babaff">&#9656;</span>
-					<a href="./view?manufacturer={{.}}">{{.}}</a>
+					<a href="./list?manufacturer={{.}}">{{.}}</a>
 				</p>
 			{{end}}
 			</td>
@@ -35,12 +44,12 @@
 			{{ range $type := $types }}
 				<div style="margin-bottom: 20px">
 				<p><span style="color: #babaff">&#9656;</span>
-					<a href="./view?type={{$type.Name}}">{{.Name}}</a>
+					<a href="./list?type={{$type.Name}}">{{.Name}}</a>
 				</p>
 				{{range $type.Subtypes}}
 					<p style="margin-left: 30px">
 						<span style="color: #babaff">&#9656;</span>
-						<a href="./view?type={{$type.Name}}&subtype={{.}}">{{.}}</a>
+						<a href="./list?type={{$type.Name}}&subtype={{.}}">{{.}}</a>
 				{{end}}
 				</div>
 			{{end}}
@@ -50,12 +59,12 @@
 			{{ range $type := $types }}
 				<div style="margin-bottom: 20px">
 				<p><span style="color: #babaff">&#9656;</span>
-					<a href="./view?type={{$type.Name}}">{{.Name}}</a>
+					<a href="./list?type={{$type.Name}}">{{.Name}}</a>
 				</p>
 				{{range $type.Manufacturers}}
 					<p style="margin-left: 30px">
 						<span style="color: #babaff">&#9656;</span>
-						<a href="./view?type={{$type.Name}}&manufacturer={{.}}">{{.}}</a>
+						<a href="./list?type={{$type.Name}}&manufacturer={{.}}">{{.}}</a>
 				{{end}}
 				</div>
 			{{end}}

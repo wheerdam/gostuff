@@ -115,12 +115,12 @@ func LogoutPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func ViewPage(w http.ResponseWriter, r *http.Request) {
+func ListingPage(w http.ResponseWriter, r *http.Request) {
 	s := session.Get(r)
 	if s == nil {
 		http.Redirect(w, r, "./login", 301)
 	} else {
-		t, _ := template.ParseFiles("templates/view.gtpl")
+		t, _ := template.ParseFiles("templates/list.gtpl")
 		userName := s.CAttr("UserName")
 		viewOps := ""
 		logicOr := false
@@ -131,7 +131,10 @@ func ViewPage(w http.ResponseWriter, r *http.Request) {
 				for i := range v {
 					if k == "op" && v[i] == "or" {
 						logicOr = true
-					} else {
+					} else if k == "type" ||
+							  k == "subtype" || 
+							  k == "manufacturer" || 
+							  k == "value" {
 						filter := FetchFilter{key: k, value: v[i]}
 						filters = append(filters, filter)
 						viewOps = viewOps + " <span style=\"color:#ababab\">" + k + "=</span>'" +
@@ -141,6 +144,8 @@ func ViewPage(w http.ResponseWriter, r *http.Request) {
 						} else {
 							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
 						}
+					} else {
+						viewOps = "<span style=\"color:#ff0000\">Error(" + k + "=" + v[i] + ")</span>"
 					}
 				}				
 			}
@@ -157,7 +162,7 @@ func ViewPage(w http.ResponseWriter, r *http.Request) {
 		manufacturers, _ := getDistinctCol("manufacturer")
 		viewData := ViewPageFields{
 				UserName: 		userName.(string),
-				ViewTitle:		"View Items",
+				ViewTitle:		"List Items",
 				Data: 			items,
 				Types:			types,
 				Manufacturers:	manufacturers,
@@ -204,7 +209,7 @@ func ItemPage(w http.ResponseWriter, r *http.Request) {
 							"<p>ItemID: " + itemID + "</p>" +
 							"<p><a href=\"./edit?id=" + itemID + 
 							"\">Add this Item</a> - " + 
-							"<a href=\"./browse\">Browse</a> - <a href=\"./view\">View All Items</a></p>",
+							"<a href=\"./browse\">Browse</a> - <a href=\"./list\">View All Items</a></p>",
 					),
 			}
 			errT.Execute(w, msg)
@@ -254,7 +259,7 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			errT.Execute(w, msg)
 		} else {
-			http.Redirect(w, r, "./view?type=" + item.Type, 301)
+			http.Redirect(w, r, "./list?type=" + item.Type, 301)
 		}
 	}
 }
@@ -618,8 +623,17 @@ func main() {
 			serveUsage()
 			return
 		}
+		// check for template files
+		templates := []string{"browse.gtpl", "edit.gtpl", "item.gtpl",
+							  "list.gtpl", "login.gtpl", "message.gtpl"}
+		for _, fileName := range templates {
+			if _, err := os.Stat("templates/"+fileName); os.IsNotExist(err) {
+				log.Fatal("templates/"+fileName + " does not exist")
+			}
+		}
+		
 		http.HandleFunc("/login", LoginPage)
-		http.HandleFunc("/view", ViewPage)
+		http.HandleFunc("/list", ListingPage)
 		http.HandleFunc("/logout", LogoutPage)
 		http.HandleFunc("/item", ItemPage)
 		http.HandleFunc("/edit", AddEditItemPage)

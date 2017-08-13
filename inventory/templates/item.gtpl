@@ -25,15 +25,16 @@
 			<hr>
 			<h2 style="vertical-align: middle"><img src="./static/open.png" height="30px" style="vertical-align: middle"> Item #{{.Info.ItemID}}</h2>
 			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
-			<p><button onclick="window.location.href='./view'">View All</button>
+			<p><button onclick="window.location.href='./list'">List All</button>
+			<button onclick="window.location.href='./browse'">Browse</button>
 			<button onclick="window.location.href='./edit?id={{.Info.ItemID}}'">Edit this Item</button>
 			<button onclick="deleteItem()">Delete Item</button>
 			</div>
 			<table width="100%">
 			<tr><td style="white-space: nowrap">Part Number</td><td width="100%">{{.Info.Model_number}}</td></tr>
-			<tr><td style="white-space: nowrap">Manufacturer</td><td><a href="./view?manufacturer={{.Info.Manufacturer}}">{{.Info.Manufacturer}}</a></td></tr>
-			<tr><td style="white-space: nowrap">Type</td><td><a href="./view?type={{.Info.Type}}">{{.Info.Type}}</a></td></tr>
-			<tr><td style="white-space: nowrap">Sub-type</td><td>{{.Info.Subtype}}</td></tr>
+			<tr><td style="white-space: nowrap">Manufacturer</td><td><a href="./list?manufacturer={{.Info.Manufacturer}}">{{.Info.Manufacturer}}</a></td></tr>
+			<tr><td style="white-space: nowrap">Type</td><td><a href="./list?type={{.Info.Type}}">{{.Info.Type}}</a></td></tr>
+			<tr><td style="white-space: nowrap">Sub-type</td><td><a href="./list?subtype={{.Info.Subtype}}">{{.Info.Subtype}}</a></td></tr>
 			<tr><td style="white-space: nowrap">Description</td><td>{{.Info.Descriptive_name}}</td></tr>
 			<tr><td style="white-space: nowrap">Physical Description</td><td>{{.Info.Phys_description}}</td></tr>
 			<tr><td style="white-space: nowrap">Product Link</td><td><a href="{{.Info.ProductURL}}">{{.Info.ProductURL}}</a></td></tr>

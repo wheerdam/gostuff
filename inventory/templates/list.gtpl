@@ -9,19 +9,17 @@
 			<img style="float:right" src="./static/logo.png" height="80px">			
 			<p>Welcome, {{.UserName}}! [<a href="./logout">Logout</a>] - CSV: <a href="./download-items">Items</a> - <a href="./download-inventory">Inventory</a></p>
 			<hr>
-			<h2>{{.ViewTitle}}</h2>			
+			<h2 style="vertical-align: middle"><img src="./static/list.png" height="30px" style="vertical-align: middle"> {{.ViewTitle}}</h2>			
 			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
 			<p style="line-height: 175%">
-			<span style="color: #babaff">&#9656;</span><strong><a href="./view">LIST ALL</a></strong>&nbsp;
+			<span style="color: #babaff">&#9656;</span><strong><a href="./list">LIST ALL</a></strong>&nbsp;
 			<span style="color: #babaff">&#9656;</span><strong><a href="./browse">BROWSE</a></strong>&nbsp;			
 			{{range $str := .Types}}
-			<span style="color: #babaff">&#9656;</span><a href="./view?type={{$str}}">{{$str}}</a>&nbsp;&nbsp;
+			<span style="color: #babaff">&#9656;</span><a href="./list?type={{$str}}">{{$str}}</a>&nbsp;&nbsp;
 			{{end}}
 			</p>
 			</div>
-			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
-			<p>{{.ViewOps}}</p>
-			</div>
+			
 			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
 			<p>
 			<form action="/item" method="post" style="margin: 0px; padding: 0px">
@@ -30,6 +28,10 @@
 				<input type="submit" value="View / Add" style="margin:0px">
 			</form>
 			</p>
+			</div>
+			
+			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
+			<p>{{.ViewOps}}</p>
 			</div>
 
 			<table width="100%">
@@ -58,12 +60,12 @@
 			<td style="padding: 10px; text-align: right; background-color: #ddffdd">{{.TotalQty}}</td>
 			
 			<td style="padding: 5px; white-space: nowrap">
-			<p><a href="./view?type={{.Type}}&subtype={{.Subtype}}">{{.Subtype}}</a></p>
+			<p><a href="./list?type={{.Type}}&subtype={{.Subtype}}">{{.Subtype}}</a></p>
 			<p style="font-size: 9pt; margin-left: 5px"><span style="color: #babaff">&#9656;</span>
-			<a href="./view?type={{.Type}}">{{.Type}}</a></p></td>
+			<a href="./list?type={{.Type}}">{{.Type}}</a></p></td>
 			
 			<td style="white-space: nowrap; padding: 5px; vertical-align: middle">
-			<p style="margin-left: 5px"><span style="color: #babaff">&#9656;</span> <a href="./view?manufacturer={{.Manufacturer}}">{{.Manufacturer}}</a></p>			
+			<p style="margin-left: 5px"><span style="color: #babaff">&#9656;</span> <a href="./list?manufacturer={{.Manufacturer}}">{{.Manufacturer}}</a></p>			
 			</td>
 			
 			<td style="width: 100%; padding: 5px">
