@@ -13,6 +13,8 @@
 			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
 			<p style="line-height: 175%">
 			<span style="color: #babaff">&#9656;</span><strong><a href="./list">LIST ALL</a></strong>&nbsp;
+			<span style="color: #babaff">&#9656;</span><strong>BROWSE</strong>&nbsp;
+			<span style="color: #babaff">&#9656;</span><strong><a href="./search">SEARCH</a></strong>&nbsp;
 			</p>
 			</div>
 			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
@@ -24,10 +26,10 @@
 			</form>
 			</p>
 			</div>
-			<div align="center">
-			<table style="border: 0px">
+			<table style="border: 0px" width="100%">
 			<tr>
 			<th>Manufacturers</th>
+			<th>Types</th>
 			<th>Types, Subtypes</th>
 			<th>Types, Manufacturers</th>
 			</tr>
@@ -42,12 +44,20 @@
 			<td style="padding-left: 10px; padding-right: 10px; vertical-align: top">
 			{{ $types := .Types }}
 			{{ range $type := $types }}
-				<div style="margin-bottom: 20px">
 				<p><span style="color: #babaff">&#9656;</span>
 					<a href="./list?type={{$type.Name}}">{{.Name}}</a>
 				</p>
+			{{end}}
+			</td>
+			<td style="padding-left: 10px; padding-right: 10px; vertical-align: top">
+			{{ $types := .Types }}
+			{{ range $type := $types }}
+				<div style="margin-bottom: 20px">
+				<p style="font-size: 8pt">
+					{{.Name}}
+				</p>
 				{{range $type.Subtypes}}
-					<p style="margin-left: 30px">
+					<p style="margin-left: 10px">
 						<span style="color: #babaff">&#9656;</span>
 						<a href="./list?type={{$type.Name}}&subtype={{.}}">{{.}}</a>
 				{{end}}
@@ -58,11 +68,11 @@
 			{{ $types := .Types }}
 			{{ range $type := $types }}
 				<div style="margin-bottom: 20px">
-				<p><span style="color: #babaff">&#9656;</span>
-					<a href="./list?type={{$type.Name}}">{{.Name}}</a>
+				<p style="font-size: 8pt">
+					{{.Name}}
 				</p>
 				{{range $type.Manufacturers}}
-					<p style="margin-left: 30px">
+					<p style="margin-left: 10px">
 						<span style="color: #babaff">&#9656;</span>
 						<a href="./list?type={{$type.Name}}&manufacturer={{.}}">{{.}}</a>
 				{{end}}
@@ -71,7 +81,6 @@
 			</td>			
 			</tr>
 			</table>
-			</div>
 		</div>
 		<div style="text-align: center; clear: both">
 		<p><a href="https://golang.org"><img src="./static/goproject.png"></a></p>

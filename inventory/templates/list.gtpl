@@ -13,7 +13,8 @@
 			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
 			<p style="line-height: 175%">
 			<span style="color: #babaff">&#9656;</span><strong><a href="./list">LIST ALL</a></strong>&nbsp;
-			<span style="color: #babaff">&#9656;</span><strong><a href="./browse">BROWSE</a></strong>&nbsp;			
+			<span style="color: #babaff">&#9656;</span><strong><a href="./browse">BROWSE</a></strong>&nbsp;
+			<span style="color: #babaff">&#9656;</span><strong><a href="./search">SEARCH</a></strong>&nbsp;
 			{{range $str := .Types}}
 			<span style="color: #babaff">&#9656;</span><a href="./list?type={{$str}}">{{$str}}</a>&nbsp;&nbsp;
 			{{end}}

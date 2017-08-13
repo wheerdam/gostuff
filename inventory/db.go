@@ -38,8 +38,9 @@ type InventoryEntry struct {
 	Quantity	int
 }
 
-type FetchFilter struct {
-	key		string
+type Condition struct {
+	key		string 		// this value MUST BE SANE
+						// do not let a client fill this value
 	value	string
 }
 
@@ -140,14 +141,14 @@ func deleteItem(itemID string) (error) {
 	return deleteAllItemEntries(itemID)
 }
 
-func getDistinctCol(colName string, conditions...FetchFilter) ([]string, error) {
+func getDistinctCol(colName string, conditions...Condition) ([]string, error) {
 	query := "select distinct " + colName + " from items"
 	values := make([]interface{}, len(conditions))
 	if len(conditions) > 0 {		
 		query = query + " where ("
 		for i := range conditions {
 			count := strconv.Itoa(i+1)
-			query = query + conditions[i].key + "= $" + count + " and "
+			query = query + conditions[i].key + "$" + count + " and "
 			values[i] = conditions[i].value
 		}
 		query = strings.TrimRight(query, " and ")
@@ -208,19 +209,19 @@ func getItems(order string) []Item {
 	return getItemsFiltered(order, false)
 }
 
-func getItemsFiltered(order string, or bool, filters...FetchFilter) []Item {
-	values := make([]interface{}, len(filters))
+func getItemsFiltered(order string, or bool, conditions...Condition) []Item {
+	values := make([]interface{}, len(conditions))
 	stmt := "select * from items"
 	logicOp := " and "
 	if or {
 		logicOp = " or "
 	}
-	if filters != nil {
+	if conditions != nil {
 		stmt = stmt + " where ("
-		for i := range filters {
+		for i := range conditions {
 			count := strconv.Itoa(i+1)
-			stmt = stmt + filters[i].key + "=$" + count + logicOp
-			values[i] = filters[i].value
+			stmt = stmt + conditions[i].key + "$" + count + logicOp
+			values[i] = conditions[i].value
 		}
 		stmt = strings.TrimRight(stmt, logicOp)
 		stmt = stmt + ")"
@@ -259,6 +260,42 @@ func getItemsFiltered(order string, or bool, filters...FetchFilter) []Item {
 		list = append(list, item)
 	}
 	return list
+}
+
+func searchItems(column string, pattern	string) ([]Item, error) {
+	rows, err := db.Query("select * from items where " +
+						  "column like %$1%", pattern)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := make([]Item, 0)
+	defer rows.Close()
+	for rows.Next() {
+		var item Item
+		item.TotalQty = 0
+		err := rows.Scan(
+			&item.serial, &item.ItemID, &item.Descriptive_name,
+			&item.Model_number, &item.Manufacturer, 
+			&item.Type, &item.Subtype,
+			&item.Phys_description,
+			&item.DatasheetURL, &item.ProductURL,
+			&item.Seller1URL, &item.Seller2URL,
+			&item.Seller3URL, &item.UnitPrice, &item.Notes, 
+			&item.Value,
+			)
+		if err != nil {
+			return nil, err
+		}
+		entries := getInventoryEntries(item.ItemID)
+		for i := range entries {
+			if entries[i].ItemID == item.ItemID {
+				item.TotalQty = item.TotalQty + entries[i].Quantity
+			}
+		}
+		list = append(list, item)
+	}
+	return list, nil
 }
 
 func getInventoryEntries(id int) []InventoryEntry {

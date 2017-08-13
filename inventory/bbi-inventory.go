@@ -126,7 +126,7 @@ func ListingPage(w http.ResponseWriter, r *http.Request) {
 		logicOr := false
 		var items []Item		
 		if len(r.URL.Query()) > 0 {
-			filters := make([]FetchFilter, 0)
+			conditions := make([]Condition, 0)
 			for k, v := range r.URL.Query() {
 				for i := range v {
 					if k == "op" && v[i] == "or" {
@@ -135,8 +135,8 @@ func ListingPage(w http.ResponseWriter, r *http.Request) {
 							  k == "subtype" || 
 							  k == "manufacturer" || 
 							  k == "value" {
-						filter := FetchFilter{key: k, value: v[i]}
-						filters = append(filters, filter)
+						condition := Condition{key: k + "=", value: v[i]}
+						conditions = append(conditions, condition)
 						viewOps = viewOps + " <span style=\"color:#ababab\">" + k + "=</span>'" +
 							v[i] + "'"
 						if logicOr {
@@ -144,8 +144,58 @@ func ListingPage(w http.ResponseWriter, r *http.Request) {
 						} else {
 							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
 						}
+					} else if k == "search-type" {
+						condition := Condition{
+							key: "type like ", value: "%" + v[i] + "%"}
+						conditions = append(conditions, condition)
+						viewOps = viewOps + " <span style=\"color:#00ff00\">contains(type='" + v[i] + "')</span>"
+						if logicOr {
+							viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
+						} else {
+							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
+						}
+					} else if k == "search-subtype" {
+						condition := Condition{
+							key: "subtype like ", value: "%" + v[i] + "%"}
+						conditions = append(conditions, condition)
+						viewOps = viewOps + " <span style=\"color:#00ff00\">contains(subtype='" + v[i] + "')</span>"
+						if logicOr {
+							viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
+						} else {
+							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
+						}
+					} else if k == "search-manufacturer" {
+						condition := Condition{
+							key: "manufacturer like ", value: "%" + v[i] + "%"}
+						conditions = append(conditions, condition)
+						viewOps = viewOps + " <span style=\"color:#00ff00\">contains(manufacturer='" + v[i] + "')</span>"
+						if logicOr {
+							viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
+						} else {
+							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
+						}
+					} else if k == "search-part-number" {
+						condition := Condition{
+							key: "model_number like ", value: "%" + v[i] + "%"}
+						conditions = append(conditions, condition)
+						viewOps = viewOps + " <span style=\"color:#00ff00\">contains(model_number='" + v[i] + "')</span>"
+						if logicOr {
+							viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
+						} else {
+							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
+						}
+					} else if k == "search-description" {
+						condition := Condition{
+							key: "descriptive_name like ", value: "%" + v[i] + "%"}
+						conditions = append(conditions, condition)
+						viewOps = viewOps + " <span style=\"color:#00ff00\">contains(description='" + v[i] + "')</span>"
+						if logicOr {
+							viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
+						} else {
+							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
+						}
 					} else {
-						viewOps = "<span style=\"color:#ff0000\">Error(" + k + "=" + v[i] + ")</span>"
+						viewOps = " <span style=\"color:#ff0000\">Error(" + k + "=" + v[i] + ")</span>"
 					}
 				}				
 			}
@@ -154,7 +204,7 @@ func ListingPage(w http.ResponseWriter, r *http.Request) {
 			} else {
 				viewOps = strings.TrimRight(viewOps, " <span style=\"color:#2222ff\">and</span>")
 			}
-			items = getItemsFiltered("type", logicOr, filters...)
+			items = getItemsFiltered("type", logicOr, conditions...)
 		} else {
 			items = getItems("type")
 		}
@@ -352,8 +402,8 @@ func BrowsePage(w http.ResponseWriter, r *http.Request) {
 		Manufacturers:	manufacturers,
 	}		
 	for i := range types {
-		condition := FetchFilter{
-			key: 	"type",
+		condition := Condition{
+			key: 	"type=",
 			value:	types[i]}
 		subtypes, err := getDistinctCol("subtype", condition)
 		typeManufacturers, _ := getDistinctCol("manufacturer", condition)
