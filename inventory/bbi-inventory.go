@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"strconv"
+	"time"
 	"net/http"
 	"html/template"
 	"database/sql"
@@ -42,6 +43,10 @@ type AddEditPageFields struct {
 type MessagePage struct {
 	Header 	string
 	Message interface{}
+}
+
+type SearchPage struct {
+	UserName	string
 }
 
 type BrowsePageFields struct {
@@ -131,6 +136,12 @@ func ListingPage(w http.ResponseWriter, r *http.Request) {
 				for i := range v {
 					if k == "op" && v[i] == "or" {
 						logicOr = true
+					}
+				}
+			}
+			for k, v := range r.URL.Query() {
+				for i, cur := range v {
+					if k == "op" && v[i] == "or" {
 					} else if k == "type" ||
 							  k == "subtype" || 
 							  k == "manufacturer" || 
@@ -145,6 +156,9 @@ func ListingPage(w http.ResponseWriter, r *http.Request) {
 							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
 						}
 					} else if k == "search-type" {
+						if cur == "" {
+							continue
+						}
 						condition := Condition{
 							key: "type like ", value: "%" + v[i] + "%"}
 						conditions = append(conditions, condition)
@@ -155,6 +169,9 @@ func ListingPage(w http.ResponseWriter, r *http.Request) {
 							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
 						}
 					} else if k == "search-subtype" {
+						if cur == "" {
+							continue
+						}
 						condition := Condition{
 							key: "subtype like ", value: "%" + v[i] + "%"}
 						conditions = append(conditions, condition)
@@ -165,6 +182,9 @@ func ListingPage(w http.ResponseWriter, r *http.Request) {
 							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
 						}
 					} else if k == "search-manufacturer" {
+						if cur == "" {
+							continue
+						}
 						condition := Condition{
 							key: "manufacturer like ", value: "%" + v[i] + "%"}
 						conditions = append(conditions, condition)
@@ -175,6 +195,9 @@ func ListingPage(w http.ResponseWriter, r *http.Request) {
 							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
 						}
 					} else if k == "search-part-number" {
+						if cur == "" {
+							continue
+						}
 						condition := Condition{
 							key: "model_number like ", value: "%" + v[i] + "%"}
 						conditions = append(conditions, condition)
@@ -185,6 +208,9 @@ func ListingPage(w http.ResponseWriter, r *http.Request) {
 							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
 						}
 					} else if k == "search-description" {
+						if cur == "" {
+							continue
+						}
 						condition := Condition{
 							key: "descriptive_name like ", value: "%" + v[i] + "%"}
 						conditions = append(conditions, condition)
@@ -194,7 +220,20 @@ func ListingPage(w http.ResponseWriter, r *http.Request) {
 						} else {
 							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
 						}
-					} else {
+					} else if k == "search-phys-description" {
+						if cur == "" {
+							continue
+						}
+						condition := Condition{
+							key: "phys_description like ", value: "%" + v[i] + "%"}
+						conditions = append(conditions, condition)
+						viewOps = viewOps + " <span style=\"color:#00ff00\">contains(phys_description='" + v[i] + "')</span>"
+						if logicOr {
+							viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
+						} else {
+							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
+						}
+					}  else {
 						viewOps = " <span style=\"color:#ff0000\">Error(" + k + "=" + v[i] + ")</span>"
 					}
 				}				
@@ -427,6 +466,34 @@ func BrowsePage(w http.ResponseWriter, r *http.Request) {
 	t.Execute(w, browsePageFields)
 }
 
+func SearchHandler(w http.ResponseWriter, r *http.Request) {
+	s := session.Get(r)
+	if s == nil {
+		http.Redirect(w, r, "./login", 301)
+		return
+	}
+	if r.Method == "GET" {
+		t, _ := template.ParseFiles("templates/search.gtpl")
+		userName := s.CAttr("UserName").(string)
+		searchPageFields := SearchPage{UserName: userName}
+		t.Execute(w, searchPageFields)
+	} else if r.Method == "POST" {
+		qType := r.FormValue("type")
+		qSubtype := r.FormValue("subtype")
+		qManufacturer := r.FormValue("manufacturer")
+		qDescription := r.FormValue("description")
+		qPartNumber := r.FormValue("part_number")
+		qPhysDescription := r.FormValue("phys_description")
+		url := "./list?search-type=" + qType +
+			   "&search-subtype=" + qSubtype +
+			   "&search-manufacturer=" + qManufacturer +
+			   "&search-description=" + qDescription +
+			   "&search-part-number=" + qPartNumber +
+			   "&search-phys-description=" + qPhysDescription
+		http.Redirect(w, r, url, 301)
+	}
+}
+
 func CommitItemHandler(w http.ResponseWriter, r *http.Request) {
 	s := session.Get(r)
 	if s == nil {
@@ -594,8 +661,13 @@ func DownloadItemsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "./login", 301)
 		return
 	}
+	now := time.Now()
+	timestamp := fmt.Sprintf("%d-%02d-%02d-%02dh%02dm%02ds",
+		now.Year(), int(now.Month()), now.Day(),
+		now.Hour(), now.Minute(), now.Second())
 	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment;filename=items.csv")
+	w.Header().Set("Content-Disposition", "attachment;filename=items-" +
+		timestamp + ".csv")
 	err := exportItems(w)
 	if err != nil {
 		// oh wow
@@ -608,8 +680,13 @@ func DownloadInventoryHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "./login", 301)
 		return
 	}
+	now := time.Now()
+	timestamp := fmt.Sprintf("%d-%02d-%02d-%02dh%02dm%02ds",
+		now.Year(), int(now.Month()), now.Day(),
+		now.Hour(), now.Minute(), now.Second())
 	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment;filename=inventory.csv")
+	w.Header().Set("Content-Disposition", "attachment;filename=inventory-" +
+		timestamp + ".csv")
 	err := exportInventory(w)
 	if err != nil {
 		// oh wow
@@ -675,7 +752,8 @@ func main() {
 		}
 		// check for template files
 		templates := []string{"browse.gtpl", "edit.gtpl", "item.gtpl",
-							  "list.gtpl", "login.gtpl", "message.gtpl"}
+							  "list.gtpl", "login.gtpl", "message.gtpl",
+							  "search.gtpl"}
 		for _, fileName := range templates {
 			if _, err := os.Stat("templates/"+fileName); os.IsNotExist(err) {
 				log.Fatal("templates/"+fileName + " does not exist")
@@ -695,6 +773,7 @@ func main() {
 		http.HandleFunc("/download-items", DownloadItemsHandler)		
 		http.HandleFunc("/download-inventory", DownloadInventoryHandler)
 		http.HandleFunc("/browse", BrowsePage)
+		http.HandleFunc("/search", SearchHandler)
 		fs := http.FileServer(http.Dir(os.Args[6]))
 		http.Handle("/static/", http.StripPrefix("/static/", fs))
 		fmt.Println("Loading users data from '" + os.Args[2] + "'...")

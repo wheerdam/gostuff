@@ -40,7 +40,7 @@ type InventoryEntry struct {
 
 type Condition struct {
 	key		string 		// this value MUST BE SANE
-						// do not let a client fill this value
+						// do not let a client fill this value directly
 	value	string
 }
 
@@ -148,6 +148,7 @@ func getDistinctCol(colName string, conditions...Condition) ([]string, error) {
 		query = query + " where ("
 		for i := range conditions {
 			count := strconv.Itoa(i+1)
+			// we're assuming the Key has been sanitized here!
 			query = query + conditions[i].key + "$" + count + " and "
 			values[i] = conditions[i].value
 		}
@@ -220,6 +221,7 @@ func getItemsFiltered(order string, or bool, conditions...Condition) []Item {
 		stmt = stmt + " where ("
 		for i := range conditions {
 			count := strconv.Itoa(i+1)
+			// we're assuming the Key has been sanitized here!
 			stmt = stmt + conditions[i].key + "$" + count + logicOp
 			values[i] = conditions[i].value
 		}
