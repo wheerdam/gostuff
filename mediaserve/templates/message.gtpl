@@ -4,7 +4,7 @@
 	<link rel="stylesheet" type="text/css" href="/static/style.css">
     <title>{{.Header}}</title>
     </head>
-    <body>
+    <body style="margin-top: 30px">
 		<div class="container" style="text-align:center">
 			<h2>{{.Header}}</h2>
 			{{.Message}}

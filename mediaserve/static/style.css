@@ -1,8 +1,12 @@
 body {
 	/*background-color: black;
 	color: white;*/
-	font-family: verdana, sans-serif;
+	font-family: noto sans, sans-serif;
 	font-size: 16px;
+	padding: 0px;
+	margin: 0px;
+	background-color: #000020;
+	color: white;
 }
 
 div.container {
@@ -10,11 +14,19 @@ div.container {
 	text-align: left;
 }
 
+a {
+    color: #00ccff;
+	text-decoration: none;
+}
 
 @media only screen and (min-width: 800px) {
+	body {
+		font-size: 11.5pt;
+	}
+	
 	div.center {
 		text-align: center;
-		width: 100%;
+		width: 100%;		
 	}
 
 	div.container {
@@ -27,18 +39,12 @@ div.container {
 
 	img.optimized-500 {
 		width: 500px;
-	}
-
-	
+	}	
 }
-
-body {
-		font-size: 14px;
-	}
 
 table, th, td {
 	border-collapse: collapse;
-	border: 1px solid black;
+	border: 0px;
 	/*ont-family: monospace;*/
 	margin-bottom: 10px;
 }
@@ -78,7 +84,7 @@ form {
 }
 label {
   display: inline-block;
-  width: 160;
+  width: 110;
 }
 input {
   display: inline-block;
