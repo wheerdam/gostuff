@@ -504,7 +504,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		qDescription := r.FormValue("description")
 		qPartNumber := r.FormValue("part_number")
 		qPhysDescription := r.FormValue("phys_description")
-		url := "./list?search-type=" + qType +
+		url := invPrefix + "/list?search-type=" + qType +
 			   "&search-subtype=" + qSubtype +
 			   "&search-manufacturer=" + qManufacturer +
 			   "&search-description=" + qDescription +
@@ -560,7 +560,7 @@ func CommitItemHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			errT.Execute(w, msg)
 		} else {
-			http.Redirect(w, r, "./item?id=" + itemID, 301)			
+			http.Redirect(w, r, invPrefix + "/item?id=" + itemID, 301)			
 		}
 	}
 }
@@ -585,7 +585,7 @@ func QtyPostHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			errT.Execute(w, msg)
 		} else {
-			http.Redirect(w, r, "./item?id=" + itemID, 301)			
+			http.Redirect(w, r, invPrefix + "/item?id=" + itemID, 301)			
 		}
 	}
 }
@@ -627,7 +627,7 @@ func DeleteEntryHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			errT.Execute(w, msg)
 		} else {
-			http.Redirect(w, r, "./item?id=" + itemID, 301)
+			http.Redirect(w, r, invPrefix + "/item?id=" + itemID, 301)
 		}
 	}
 }
@@ -669,7 +669,7 @@ func AddEntryHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			errT.Execute(w, msg)
 		} else {
-			http.Redirect(w, r, "./item?id=" + itemID, 301)
+			http.Redirect(w, r, invPrefix + "/item?id=" + itemID, 301)
 		}
 	}
 }
