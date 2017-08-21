@@ -1,12 +1,12 @@
-package main
+package inventory
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"strconv"
 	"time"
+	"errors"
 	"net/http"
 	"html/template"
 	"database/sql"
@@ -14,10 +14,13 @@ import (
 	"github.com/icza/session"
 )
 
-var users *netutil.Users
-var db *sql.DB
+var	invTemplatePath string
+var invPrefix string
+var invUsers *netutil.Users
+var invDB *sql.DB
 
 type ViewPageFields struct {
+	Prefix			string
 	UserName 		string
 	ViewTitle		string
 	Types			[]string
@@ -27,12 +30,14 @@ type ViewPageFields struct {
 }
 
 type ItemPageFields struct {
+	Prefix		string
 	UserName	string
 	Info		*Item
 	InvEntries	[]InventoryEntry
 }
 
 type AddEditPageFields struct {
+	Prefix		string
 	UserName	string
 	Header		string
 	Info		*Item
@@ -41,15 +46,18 @@ type AddEditPageFields struct {
 }
 
 type MessagePage struct {
-	Header 	string
-	Message interface{}
+	Prefix		string
+	Header 		string
+	Message	 	interface{}
 }
 
 type SearchPage struct {
-	UserName	string
+	Prefix			string
+	UserName		string
 }
 
 type BrowsePageFields struct {
+	Prefix			string
 	UserName		string
 	Types			[]Type
 	Manufacturers	[]string
@@ -64,19 +72,20 @@ type Type struct {
 func LoginPage(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
         t, _ := template.ParseFiles("templates/login.gtpl")
-        t.Execute(w, nil)
+        t.Execute(w, SearchPage{invPrefix, ""})
     } else {
         r.ParseForm()
         // logic part of log in
 		userName := r.FormValue("username")
-		err := users.Login(userName, r.FormValue("password"))
+		err := invUsers.Login(userName, r.FormValue("password"))
 		if err != nil {
 			t, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
+					Prefix: invPrefix,
 					Header: "Login Failed",
 					Message: template.HTML(
 						"<p>Incorrect name and/or password was provided</p>" +
-						"<p><a href=\"./login\">Retry</a></p>",
+						"<p><a href=\"" + invPrefix + "/login\">Retry</a></p>",
 					),
 			}
 			t.Execute(w, msg)
@@ -87,10 +96,13 @@ func LoginPage(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			s := session.NewSessionOptions(&session.SessOptions{
-					CAttrs: map[string]interface{}{"UserName": userName},
+					CAttrs: map[string]interface{}{
+						"UserName": userName,
+						"Inventory": "Yes",
+					},
 			})
 			session.Add(s, w)
-			http.Redirect(w, r, "./browse", 301)
+			http.Redirect(w, r, invPrefix + "/browse", 301)
 		}
     }
 }
@@ -100,10 +112,11 @@ func LogoutPage(w http.ResponseWriter, r *http.Request) {
 	if s == nil {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
+				Prefix: invPrefix,
 				Header:	"Logout Failed",
 				Message: template.HTML(
 						"<p>You were not logged in</p>" +
-						"<p><a href=\"./login\">Login</a></p>",
+						"<p><a href=\"" + invPrefix + "/login\">Login</a></p>",
 				),
 		}
 		t.Execute(w, msg)
@@ -111,9 +124,10 @@ func LogoutPage(w http.ResponseWriter, r *http.Request) {
 		session.Remove(s, w)
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
+				Prefix: invPrefix,
 				Header: "Logged Out",
 				Message: template.HTML(
-						"<p><a href=\"./login\">Login</a></p>",
+						"<p><a href=\"" + invPrefix + "/login\">Login</a></p>",
 				),
 		}
 		t.Execute(w, msg)
@@ -123,7 +137,7 @@ func LogoutPage(w http.ResponseWriter, r *http.Request) {
 func ListingPage(w http.ResponseWriter, r *http.Request) {
 	s := session.Get(r)
 	if s == nil {
-		http.Redirect(w, r, "./login", 301)
+		http.Redirect(w, r, invPrefix + "/login", 301)
 	} else {
 		t, _ := template.ParseFiles("templates/list.gtpl")
 		userName := s.CAttr("UserName")
@@ -250,6 +264,7 @@ func ListingPage(w http.ResponseWriter, r *http.Request) {
 		types, _ := getDistinctCol("type")
 		manufacturers, _ := getDistinctCol("manufacturer")
 		viewData := ViewPageFields{
+				Prefix:			invPrefix,
 				UserName: 		userName.(string),
 				ViewTitle:		"List Items",
 				Data: 			items,
@@ -269,7 +284,7 @@ func ListingPage(w http.ResponseWriter, r *http.Request) {
 func ItemPage(w http.ResponseWriter, r *http.Request) {
 	s := session.Get(r)
 	if s == nil {
-		http.Redirect(w, r, "./login", 301)
+		http.Redirect(w, r, invPrefix + "/login", 301)
 		return
 	}
 	var itemID string
@@ -281,6 +296,7 @@ func ItemPage(w http.ResponseWriter, r *http.Request) {
 	if itemID == "" {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
+				Prefix: invPrefix,
 				Header: "Missing Item ID",
 				Message: template.HTML(
 						"<p>ItemID was not provided in the URL</p>",
@@ -293,12 +309,13 @@ func ItemPage(w http.ResponseWriter, r *http.Request) {
 		if item == nil || err != nil {
 			errT, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
+					Prefix: invPrefix,
 					Header: "Failed to Process Item",
 					Message: template.HTML(
 							"<p>ItemID: " + itemID + "</p>" +
-							"<p><a href=\"./edit?id=" + itemID + 
+							"<p><a href=\"" + invPrefix + "/edit?id=" + itemID + 
 							"\">Add this Item</a> - " + 
-							"<a href=\"./browse\">Browse</a> - <a href=\"./list\">View All Items</a></p>",
+							"<a href=\"" + invPrefix + "/browse\">Browse</a> - <a href=\"" + invPrefix + "/list\">View All Items</a></p>",
 					),
 			}
 			errT.Execute(w, msg)
@@ -306,6 +323,7 @@ func ItemPage(w http.ResponseWriter, r *http.Request) {
 		}
 		userName := s.CAttr("UserName")
 		itemData := ItemPageFields{
+				Prefix:		invPrefix,
 				UserName:	userName.(string),
 				Info:		item,
 				InvEntries:	invEntries,
@@ -317,7 +335,7 @@ func ItemPage(w http.ResponseWriter, r *http.Request) {
 func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	s := session.Get(r)
 	if s == nil {
-		http.Redirect(w, r, "./login", 301)
+		http.Redirect(w, r, invPrefix + "/login", 301)
 		return
 	}
 	var itemID string
@@ -329,6 +347,7 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	if itemID == "" {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
+				Prefix: invPrefix,
 				Header: "Missing Item ID",
 				Message: template.HTML(
 						"<p>ItemID was not provided in the URL</p>",
@@ -341,6 +360,7 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			errT, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
+					Prefix: invPrefix,
 					Header: "Failed to Process Item",
 					Message: template.HTML(
 							"<p>Error: " + err.Error() + "</p>",
@@ -348,7 +368,7 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			errT.Execute(w, msg)
 		} else {
-			http.Redirect(w, r, "./list?type=" + item.Type, 301)
+			http.Redirect(w, r, invPrefix + "/list?type=" + item.Type, 301)
 		}
 	}
 }
@@ -356,7 +376,7 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
 	s := session.Get(r)
 	if s == nil {
-		http.Redirect(w, r, "./login", 301)
+		http.Redirect(w, r, invPrefix + "/login", 301)
 		return
 	}
 	var itemID string
@@ -370,6 +390,7 @@ func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
 	if itemID == "" || err != nil {
 		errT, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
+				Prefix: invPrefix,
 				Header: "Failed to Process Item",
 				Message: template.HTML(
 						"<p>Item ID was not provided or was invalid!</p>",
@@ -381,6 +402,7 @@ func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
 	if item != nil {
 		strFooter := " <button onclick=\"history.back()\">Cancel</button>"
 		fields := AddEditPageFields {
+			Prefix:		invPrefix,
 			UserName:	s.CAttr("UserName").(string),
 			Header:		"Edit Item #" + itemID,
 			Info:		item,
@@ -392,6 +414,7 @@ func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
 		strFooter := " <button onclick=\"window.location.href='./browse'; return false\">Cancel</button>"
 		intItemID, _ := strconv.Atoi(itemID)
 		fields := AddEditPageFields {
+			Prefix:		invPrefix,
 			UserName:	s.CAttr("UserName").(string),
 			Header:		"Add Item #" + itemID,
 			Info:		&Item{ItemID: intItemID},
@@ -405,7 +428,7 @@ func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
 func BrowsePage(w http.ResponseWriter, r *http.Request) {
 	s := session.Get(r)
 	if s == nil {
-		http.Redirect(w, r, "./login", 301)
+		http.Redirect(w, r, invPrefix + "/login", 301)
 		return
 	}
 	userName := s.CAttr("UserName").(string)
@@ -413,6 +436,7 @@ func BrowsePage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		errT, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
+				Prefix: invPrefix,
 				Header: "Failed to Get Item Types",
 				Message: template.HTML(
 						"<p>This should not happen, please contact the administrator</p>" +
@@ -426,6 +450,7 @@ func BrowsePage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		errT, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
+				Prefix: invPrefix,
 				Header: "Failed to Get Item Types",
 				Message: template.HTML(
 						"<p>This should not happen, please contact the administrator</p>" +
@@ -436,6 +461,7 @@ func BrowsePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	browsePageFields := BrowsePageFields{
+		Prefix:			invPrefix,
 		UserName:		userName,
 		Types:			make([]Type, len(types)),
 		Manufacturers:	manufacturers,
@@ -449,6 +475,7 @@ func BrowsePage(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			errT, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
+					Prefix: invPrefix,
 					Header: "Failed to Get Subtypes",
 					Message: template.HTML(
 							"<p>This should not happen, please contact the administrator</p>" +
@@ -469,13 +496,13 @@ func BrowsePage(w http.ResponseWriter, r *http.Request) {
 func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	s := session.Get(r)
 	if s == nil {
-		http.Redirect(w, r, "./login", 301)
+		http.Redirect(w, r, invPrefix + "/login", 301)
 		return
 	}
 	if r.Method == "GET" {
 		t, _ := template.ParseFiles("templates/search.gtpl")
 		userName := s.CAttr("UserName").(string)
-		searchPageFields := SearchPage{UserName: userName}
+		searchPageFields := SearchPage{invPrefix, userName}
 		t.Execute(w, searchPageFields)
 	} else if r.Method == "POST" {
 		qType := r.FormValue("type")
@@ -506,6 +533,7 @@ func CommitItemHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			errT, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
+					Prefix: invPrefix,
 					Header: "Failed to Process Item",
 					Message: template.HTML(
 							"<p>Invalid Field Values</p>",
@@ -533,6 +561,7 @@ func CommitItemHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			errT, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
+					Prefix: invPrefix,
 					Header: "Failed to Process Item",
 					Message: template.HTML(
 							"<p>Error: " + err.Error() + "</p>",
@@ -559,6 +588,7 @@ func QtyPostHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			errT, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
+					Prefix: invPrefix,
 					Header: "Failed to Process Item",
 					Message: template.HTML(
 							"<p>Error: " + err.Error() + "</p>",
@@ -590,6 +620,7 @@ func DeleteEntryHandler(w http.ResponseWriter, r *http.Request) {
 	if itemID == "" || location == "" {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
+				Prefix: invPrefix,
 				Header: "Missing Fields",
 				Message: template.HTML(
 						"<p>Some fields missing</p>",
@@ -601,6 +632,7 @@ func DeleteEntryHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			errT, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
+					Prefix: invPrefix,
 					Header: "Failed to Process Item",
 					Message: template.HTML(
 							"<p>Error: " + err.Error() + "</p>",
@@ -632,6 +664,7 @@ func AddEntryHandler(w http.ResponseWriter, r *http.Request) {
 	if itemID == "" || location == "" {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
+				Prefix: invPrefix,
 				Header: "Missing Fields",
 				Message: template.HTML(
 						"<p>Some fields missing</p>",
@@ -643,6 +676,7 @@ func AddEntryHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			errT, _ := template.ParseFiles("templates/message.gtpl")
 			msg := MessagePage{
+					Prefix: invPrefix,
 					Header: "Failed to Process Item",
 					Message: template.HTML(
 							"<p>Error: " + err.Error() + "</p>",
@@ -668,7 +702,7 @@ func DownloadItemsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", "attachment;filename=items-" +
 		timestamp + ".csv")
-	err := exportItems(w)
+	err := ExportItems(w)
 	if err != nil {
 		// oh wow
 	}
@@ -687,164 +721,53 @@ func DownloadInventoryHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", "attachment;filename=inventory-" +
 		timestamp + ".csv")
-	err := exportInventory(w)
+	err := ExportInventory(w)
 	if err != nil {
 		// oh wow
 	}
 }
 
-func usage() {
-	fmt.Println("usage: inventory [command]\n")
-	fmt.Println("commands:")
-	usersUsage()
-	fmt.Println()
-	dbUsage()
-	fmt.Println()	
-	serveUsage()
-	fmt.Println()
-}
-
-func usersUsage() {
-	fmt.Println("  users [users-file] list")
-	fmt.Println("                     add [username] [password]")
-	fmt.Println("                     delete [username]")
-	fmt.Println("                     test-login [username] [password]")
-}
-
-func serveUsage() {
-	fmt.Println("  serve [users-file] [db-config] [cert] [key] [static-dir]")
-}
-
-func dbUsage() {
-	fmt.Println("  db [db-config] create-default-config")
-	fmt.Println("                 create-tables")
-	fmt.Println("                 delete-tables")
-	fmt.Println("                 export-items [output-file]")
-	fmt.Println("                 export-inventory [output-file]")
-	fmt.Println("                 import-items [input-file]")
-	fmt.Println("                 import-inventory [input-file]")
-	fmt.Println("                 list-items")
-	fmt.Println("                 list-inventory")
-}
-
-func main() {
-	if len(os.Args) < 2 {
-		usage()
-		return
-	}	
-	switch os.Args[1] {
-	case "users":
-		if len(os.Args) < 4 {
-			usersUsage()
-			return
+func Install(prefix string, usersFile string, templateDir string, staticDir string,
+		dbConf string) (error) {
+	invPrefix = "/" + prefix
+	fmt.Println("Installing inventory handlers to '" + prefix + "'")
+	// check for template files
+	templates := []string{"browse.gtpl", "edit.gtpl", "item.gtpl",
+						  "list.gtpl", "login.gtpl", "message.gtpl",
+						  "search.gtpl"}
+	for _, fileName := range templates {
+		if _, err := os.Stat(templateDir + "/" + fileName); os.IsNotExist(err) {
+			return errors.New(templateDir + "/" + fileName + " does not exist")
 		}
-		handleUserOps()
-	case "db":
-		if len(os.Args) < 4 {
-			dbUsage()
-			return
-		}
-		handleDbOps()
-	case "serve":
-		if len(os.Args) != 7 {
-			serveUsage()
-			return
-		}
-		// check for template files
-		templates := []string{"browse.gtpl", "edit.gtpl", "item.gtpl",
-							  "list.gtpl", "login.gtpl", "message.gtpl",
-							  "search.gtpl"}
-		for _, fileName := range templates {
-			if _, err := os.Stat("templates/"+fileName); os.IsNotExist(err) {
-				log.Fatal("templates/"+fileName + " does not exist")
-			}
-		}
-		
-		http.HandleFunc("/login", LoginPage)
-		http.HandleFunc("/list", ListingPage)
-		http.HandleFunc("/logout", LogoutPage)
-		http.HandleFunc("/item", ItemPage)
-		http.HandleFunc("/edit", AddEditItemPage)
-		http.HandleFunc("/delete", DeleteHandler)
-		http.HandleFunc("/commit", CommitItemHandler)
-		http.HandleFunc("/modify-qty", QtyPostHandler)
-		http.HandleFunc("/delete-entry", DeleteEntryHandler)
-		http.HandleFunc("/add-entry", AddEntryHandler)
-		http.HandleFunc("/download-items", DownloadItemsHandler)		
-		http.HandleFunc("/download-inventory", DownloadInventoryHandler)
-		http.HandleFunc("/browse", BrowsePage)
-		http.HandleFunc("/search", SearchHandler)
-		fs := http.FileServer(http.Dir(os.Args[6]))
-		http.Handle("/static/", http.StripPrefix("/static/", fs))
-		fmt.Println("Loading users data from '" + os.Args[2] + "'...")
-		users = netutil.NewUsers()
-		err := users.LoadFromFile(os.Args[2])
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Println("Connecting to database defined by '" +
-				    os.Args[3] + "'...")
-		db, err = netutil.OpenPostgresDBFromConfig(os.Args[3])
-		fmt.Println("Listening for connections on port 44443...")
-		err = http.ListenAndServeTLS(":44443", os.Args[4], os.Args[5], nil)
-		if err != nil {
-			log.Fatal("ListenAndServe: ", err)
-		}
-	}
-}
-
-func handleUserOps() {
-	path := os.Args[2]
-	command := os.Args[3]
-	params := os.Args[4:]
-	users = netutil.NewUsers()
-	err := users.LoadFromFile(path)
-	if err != nil {
-		log.Fatal(err)
 	}
 	
-	switch command {
-	case "list":		
-		userList := users.GetList()
-		fmt.Println(len(userList), "users: ")
-		for i := range userList {
-			fmt.Print(i, " " + userList[i] + "\n")
-		}
-	case "add":
-		if len(params) != 2 {
-			fmt.Println("usage: inventory users [users-file] add [name] [password]")
-			return
-		}
-		fmt.Println("Adding user '" + params[0] + "'")
-		err := users.Add(params[0], params[1])
-		if err != nil {
-			log.Fatal(err)
-		}
-	case "test-login":
-		if len(params) != 2 {
-			fmt.Println("usage: inventory users [users-file] test-login [name] [password]")
-			return
-		}
-		err := users.Login(params[0], params[1])
-		if err != nil {
-			log.Fatal(err)
-		} else {
-			fmt.Println("Login Successful")
-		}
-	case "delete":
-		if len(params) != 1 {
-			fmt.Println("usage: inventory users [users-file] delete [name]")
-			return
-		}
-		users.Delete(params[0])
-	default:
-		fmt.Println(command, "is an invalid subcommand\n")
-		usersUsage()
-		return
-	}
-	
-	err = users.SaveToFile(path)
+	http.HandleFunc(invPrefix+"/login", LoginPage)
+	http.HandleFunc(invPrefix+"/list", ListingPage)
+	http.HandleFunc(invPrefix+"/logout", LogoutPage)
+	http.HandleFunc(invPrefix+"/item", ItemPage)
+	http.HandleFunc(invPrefix+"/edit", AddEditItemPage)
+	http.HandleFunc(invPrefix+"/delete", DeleteHandler)
+	http.HandleFunc(invPrefix+"/commit", CommitItemHandler)
+	http.HandleFunc(invPrefix+"/modify-qty", QtyPostHandler)
+	http.HandleFunc(invPrefix+"/delete-entry", DeleteEntryHandler)
+	http.HandleFunc(invPrefix+"/add-entry", AddEntryHandler)
+	http.HandleFunc(invPrefix+"/download-items", DownloadItemsHandler)		
+	http.HandleFunc(invPrefix+"/download-inventory", DownloadInventoryHandler)
+	http.HandleFunc(invPrefix+"/browse", BrowsePage)
+	http.HandleFunc(invPrefix+"/search", SearchHandler)
+	fs := http.FileServer(http.Dir(staticDir))
+	http.Handle(invPrefix+"/static/", http.StripPrefix(invPrefix+"/static/", fs))
+	fmt.Println("Loading users data from '" + usersFile + "'...")
+	invUsers = netutil.NewUsers()
+	err := invUsers.LoadFromFile(usersFile)
 	if err != nil {
-		log.Fatal(err)
+		return err 
 	}
+	fmt.Println("Connecting to database defined by '" +
+				os.Args[3] + "'...")
+	invDB, err = netutil.OpenPostgresDBFromConfig(dbConf)
+	if err != nil {
+		return err
+	}
+	return nil
 }

@@ -1,16 +1,16 @@
 <html>
     <head>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<link rel="stylesheet" type="text/css" href="/static/style.css">
+	<link rel="stylesheet" type="text/css" href="{{.Prefix}}/static/style.css">
     <title>BBI Inventory System</title>
     </head>
     <body>
 		<div class="container">
-			<img style="float:right" src="./static/logo.png" height="80px">			
-			<p class="centered">Welcome, {{.UserName}}! [<a href="./logout">Logout</a>]</p>
+			<img style="float:right" src="{{.Prefix}}/static/logo.png" height="80px">			
+			<p class="centered">Welcome, {{.UserName}}! [<a href="{{.Prefix}}/logout">Logout</a>]</p>
 			<hr>
-			<h2 style="vertical-align: middle"><img src="./static/edit.png" height="30px" style="vertical-align: middle"> {{.Header}}</h2>
-			<form action="/commit" method="post">
+			<h2 style="vertical-align: middle"><img src="{{.Prefix}}/static/edit.png" height="30px" style="vertical-align: middle"> {{.Header}}</h2>
+			<form action="{{.Prefix}}/commit" method="post">
 			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
 				<p><input type="submit" value="Commit"> {{.Footer}}</p>
 				</div>
@@ -34,7 +34,7 @@
 			</table>
 			<h2>Inventory Locations:</h2>
 			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
-			<form action="/add-entry" method="post">
+			<form action="{{.Prefix}}/add-entry" method="post">
 				<p><input size="10" type="text" readonly="readonly" name="id" value="{{.Info.ItemID}}"></p>
 				<p><label for="location">Add a Location:</label><input id="location" size="60" type="text" name="location">
 				<input type="submit" value="Add"></p>
@@ -43,7 +43,7 @@
 			</div>
 			<table width="100%">
 			{{range .InvEntries}}
-			<form action="/delete-entry" method="post">
+			<form action="{{$.Prefix}}/delete-entry" method="post">
 			<tr>
 			<td><input size="10" type="text" readonly="readonly" name="id" value="{{.ItemID}}"></td>
 			<td><input size="30" type="text" readonly="readonly" name="location" value="{{.Location}}"></td>

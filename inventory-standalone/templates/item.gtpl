@@ -1,13 +1,13 @@
 <html>
     <head>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<link rel="stylesheet" type="text/css" href="/static/style.css">
+	<link rel="stylesheet" type="text/css" href="{{.Prefix}}/static/style.css">
     <title>BBI Inventory System</title>
 	<script>
 	function deleteItem() {
 		var txt;
 		if (confirm("Are you sure you want to delete this item?") == true) {
-			window.location = "./delete?id={{.Info.ItemID}}";
+			window.location = "{{.Prefix}}/delete?id={{.Info.ItemID}}";
 		}
 	}
 	</script>
@@ -20,10 +20,10 @@
     </head>
     <body>
 		<div class="container">
-			<img style="float:right" src="./static/logo.png" height="80px">			
-			<p class="centered">Welcome, {{.UserName}}! [<a href="./logout">Logout</a>]</p>
+			<img style="float:right" src="{{.Prefix}}/static/logo.png" height="80px">			
+			<p class="centered">Welcome, {{.UserName}}! [<a href="{{.Prefix}}/logout">Logout</a>]</p>
 			<hr>
-			<h2 style="vertical-align: middle"><img src="./static/open.png" height="30px" style="vertical-align: middle"> Item #{{.Info.ItemID}}</h2>
+			<h2 style="vertical-align: middle"><img src="{{.Prefix}}/static/open.png" height="30px" style="vertical-align: middle"> Item #{{.Info.ItemID}}</h2>
 			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
 			<p><button onclick="window.location.href='./list'">List All</button>
 			<button onclick="window.location.href='./browse'">Browse</button>
@@ -32,9 +32,9 @@
 			</div>
 			<table width="100%">
 			<tr><td style="white-space: nowrap">Part Number</td><td width="100%">{{.Info.Model_number}}</td></tr>
-			<tr><td style="white-space: nowrap">Manufacturer</td><td><a href="./list?manufacturer={{.Info.Manufacturer}}">{{.Info.Manufacturer}}</a></td></tr>
-			<tr><td style="white-space: nowrap">Type</td><td><a href="./list?type={{.Info.Type}}">{{.Info.Type}}</a></td></tr>
-			<tr><td style="white-space: nowrap">Sub-type</td><td><a href="./list?subtype={{.Info.Subtype}}">{{.Info.Subtype}}</a></td></tr>
+			<tr><td style="white-space: nowrap">Manufacturer</td><td><a href="{{.Prefix}}/list?manufacturer={{.Info.Manufacturer}}">{{.Info.Manufacturer}}</a></td></tr>
+			<tr><td style="white-space: nowrap">Type</td><td><a href="{{.Prefix}}/list?type={{.Info.Type}}">{{.Info.Type}}</a></td></tr>
+			<tr><td style="white-space: nowrap">Sub-type</td><td><a href="{{.Prefix}}/list?subtype={{.Info.Subtype}}">{{.Info.Subtype}}</a></td></tr>
 			<tr><td style="white-space: nowrap">Description</td><td>{{.Info.Descriptive_name}}</td></tr>
 			<tr><td style="white-space: nowrap">Physical Description</td><td>{{.Info.Phys_description}}</td></tr>
 			<tr><td style="white-space: nowrap">Product Link</td><td><a href="{{.Info.ProductURL}}">{{.Info.ProductURL}}</a></td></tr>
@@ -56,7 +56,7 @@
 			</tr>
 			{{range .InvEntries}}
 			<tr>
-			<form action="/modify-qty" method="post">
+			<form action="{{$.Prefix}}/modify-qty" method="post">
 			<td><input size="10" type="text" name="id" readonly="readonly" value="{{.ItemID}}"></td>
 			<td><input size="30" type="text" name="location" readonly="readonly" value="{{.Location}}"></td>
 			<td><input size="10" type="text" name="quantity" value="{{.Quantity}}">
