@@ -35,7 +35,7 @@ func main() {
 			return
 		}
 
-		err := inventory.Install("inventory", os.Args[2], "templates", os.Args[6], os.Args[3])
+		err := inventory.Install("", os.Args[2], "templates", os.Args[6], os.Args[3])
 		if err != nil {
 			log.Fatal(err)
 		}

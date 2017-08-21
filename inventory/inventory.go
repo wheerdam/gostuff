@@ -728,7 +728,11 @@ func checkSession(w http.ResponseWriter, r *http.Request) bool {
 
 func Install(prefix string, usersFile string, templateDir string, staticDir string,
 		dbConf string) (error) {
-	invPrefix = "/" + prefix
+	if prefix != "" {
+		invPrefix = "/" + prefix
+	} else {
+		invPrefix = ""
+	}
 	invTemplatePath = templateDir
 	fmt.Println("Installing inventory handlers to '" + prefix + "'")
 	// check for template files
