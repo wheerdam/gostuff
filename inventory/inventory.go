@@ -71,7 +71,7 @@ type Type struct {
 
 func LoginPage(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-        t, _ := template.ParseFiles("templates/login.gtpl")
+        t, _ := template.ParseFiles(invTemplatePath + "/login.gtpl")
         t.Execute(w, SearchPage{invPrefix, ""})
     } else {
         r.ParseForm()
@@ -79,7 +79,7 @@ func LoginPage(w http.ResponseWriter, r *http.Request) {
 		userName := r.FormValue("username")
 		err := invUsers.Login(userName, r.FormValue("password"))
 		if err != nil {
-			t, _ := template.ParseFiles("templates/message.gtpl")
+			t, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 			msg := MessagePage{
 					Prefix: invPrefix,
 					Header: "Login Failed",
@@ -108,9 +108,8 @@ func LoginPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func LogoutPage(w http.ResponseWriter, r *http.Request) {
-	s := session.Get(r)
-	if s == nil {
-		t, _ := template.ParseFiles("templates/message.gtpl")
+	if !checkSession(w, r) {
+		t, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 		msg := MessagePage{
 				Prefix: invPrefix,
 				Header:	"Logout Failed",
@@ -121,8 +120,9 @@ func LogoutPage(w http.ResponseWriter, r *http.Request) {
 		}
 		t.Execute(w, msg)
 	} else {
+		s := session.Get(r)
 		session.Remove(s, w)
-		t, _ := template.ParseFiles("templates/message.gtpl")
+		t, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 		msg := MessagePage{
 				Prefix: invPrefix,
 				Header: "Logged Out",
@@ -135,158 +135,156 @@ func LogoutPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func ListingPage(w http.ResponseWriter, r *http.Request) {
+	if !checkSession(w, r) {
+		return
+	}
 	s := session.Get(r)
-	if s == nil {
-		http.Redirect(w, r, invPrefix + "/login", 301)
-	} else {
-		t, _ := template.ParseFiles("templates/list.gtpl")
-		userName := s.CAttr("UserName")
-		viewOps := ""
-		logicOr := false
-		var items []Item		
-		if len(r.URL.Query()) > 0 {
-			conditions := make([]Condition, 0)
-			for k, v := range r.URL.Query() {
-				for i := range v {
-					if k == "op" && v[i] == "or" {
-						logicOr = true
-					}
+	t, _ := template.ParseFiles(invTemplatePath + "/list.gtpl")
+	userName := s.CAttr("UserName")
+	viewOps := ""
+	logicOr := false
+	var items []Item		
+	if len(r.URL.Query()) > 0 {
+		conditions := make([]Condition, 0)
+		for k, v := range r.URL.Query() {
+			for i := range v {
+				if k == "op" && v[i] == "or" {
+					logicOr = true
 				}
 			}
-			for k, v := range r.URL.Query() {
-				for i, cur := range v {
-					if k == "op" && v[i] == "or" {
-					} else if k == "type" ||
-							  k == "subtype" || 
-							  k == "manufacturer" || 
-							  k == "value" {
-						condition := Condition{key: k + "=", value: v[i]}
-						conditions = append(conditions, condition)
-						viewOps = viewOps + " <span style=\"color:#ababab\">" + k + "=</span>'" +
-							v[i] + "'"
-						if logicOr {
-							viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
-						} else {
-							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
-						}
-					} else if k == "search-type" {
-						if cur == "" {
-							continue
-						}
-						condition := Condition{
-							key: "type like ", value: "%" + v[i] + "%"}
-						conditions = append(conditions, condition)
-						viewOps = viewOps + " <span style=\"color:#00ff00\">contains(type='" + v[i] + "')</span>"
-						if logicOr {
-							viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
-						} else {
-							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
-						}
-					} else if k == "search-subtype" {
-						if cur == "" {
-							continue
-						}
-						condition := Condition{
-							key: "subtype like ", value: "%" + v[i] + "%"}
-						conditions = append(conditions, condition)
-						viewOps = viewOps + " <span style=\"color:#00ff00\">contains(subtype='" + v[i] + "')</span>"
-						if logicOr {
-							viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
-						} else {
-							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
-						}
-					} else if k == "search-manufacturer" {
-						if cur == "" {
-							continue
-						}
-						condition := Condition{
-							key: "manufacturer like ", value: "%" + v[i] + "%"}
-						conditions = append(conditions, condition)
-						viewOps = viewOps + " <span style=\"color:#00ff00\">contains(manufacturer='" + v[i] + "')</span>"
-						if logicOr {
-							viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
-						} else {
-							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
-						}
-					} else if k == "search-part-number" {
-						if cur == "" {
-							continue
-						}
-						condition := Condition{
-							key: "model_number like ", value: "%" + v[i] + "%"}
-						conditions = append(conditions, condition)
-						viewOps = viewOps + " <span style=\"color:#00ff00\">contains(model_number='" + v[i] + "')</span>"
-						if logicOr {
-							viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
-						} else {
-							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
-						}
-					} else if k == "search-description" {
-						if cur == "" {
-							continue
-						}
-						condition := Condition{
-							key: "descriptive_name like ", value: "%" + v[i] + "%"}
-						conditions = append(conditions, condition)
-						viewOps = viewOps + " <span style=\"color:#00ff00\">contains(description='" + v[i] + "')</span>"
-						if logicOr {
-							viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
-						} else {
-							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
-						}
-					} else if k == "search-phys-description" {
-						if cur == "" {
-							continue
-						}
-						condition := Condition{
-							key: "phys_description like ", value: "%" + v[i] + "%"}
-						conditions = append(conditions, condition)
-						viewOps = viewOps + " <span style=\"color:#00ff00\">contains(phys_description='" + v[i] + "')</span>"
-						if logicOr {
-							viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
-						} else {
-							viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
-						}
-					}  else {
-						viewOps = " <span style=\"color:#ff0000\">Error(" + k + "=" + v[i] + ")</span>"
+		}
+		for k, v := range r.URL.Query() {
+			for i, cur := range v {
+				if k == "op" && v[i] == "or" {
+				} else if k == "type" ||
+						  k == "subtype" || 
+						  k == "manufacturer" || 
+						  k == "value" {
+					condition := Condition{key: k + "=", value: v[i]}
+					conditions = append(conditions, condition)
+					viewOps = viewOps + " <span style=\"color:#ababab\">" + k + "=</span>'" +
+						v[i] + "'"
+					if logicOr {
+						viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
+					} else {
+						viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
 					}
-				}				
-			}
-			if logicOr {
-				viewOps = strings.TrimRight(viewOps, " <span style=\"color:#2222ff\">or</span>")
-			} else {
-				viewOps = strings.TrimRight(viewOps, " <span style=\"color:#2222ff\">and</span>")
-			}
-			items = getItemsFiltered("type", logicOr, conditions...)
+				} else if k == "search-type" {
+					if cur == "" {
+						continue
+					}
+					condition := Condition{
+						key: "type like ", value: "%" + v[i] + "%"}
+					conditions = append(conditions, condition)
+					viewOps = viewOps + " <span style=\"color:#00ff00\">contains(type='" + v[i] + "')</span>"
+					if logicOr {
+						viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
+					} else {
+						viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
+					}
+				} else if k == "search-subtype" {
+					if cur == "" {
+						continue
+					}
+					condition := Condition{
+						key: "subtype like ", value: "%" + v[i] + "%"}
+					conditions = append(conditions, condition)
+					viewOps = viewOps + " <span style=\"color:#00ff00\">contains(subtype='" + v[i] + "')</span>"
+					if logicOr {
+						viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
+					} else {
+						viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
+					}
+				} else if k == "search-manufacturer" {
+					if cur == "" {
+						continue
+					}
+					condition := Condition{
+						key: "manufacturer like ", value: "%" + v[i] + "%"}
+					conditions = append(conditions, condition)
+					viewOps = viewOps + " <span style=\"color:#00ff00\">contains(manufacturer='" + v[i] + "')</span>"
+					if logicOr {
+						viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
+					} else {
+						viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
+					}
+				} else if k == "search-part-number" {
+					if cur == "" {
+						continue
+					}
+					condition := Condition{
+						key: "model_number like ", value: "%" + v[i] + "%"}
+					conditions = append(conditions, condition)
+					viewOps = viewOps + " <span style=\"color:#00ff00\">contains(model_number='" + v[i] + "')</span>"
+					if logicOr {
+						viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
+					} else {
+						viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
+					}
+				} else if k == "search-description" {
+					if cur == "" {
+						continue
+					}
+					condition := Condition{
+						key: "descriptive_name like ", value: "%" + v[i] + "%"}
+					conditions = append(conditions, condition)
+					viewOps = viewOps + " <span style=\"color:#00ff00\">contains(description='" + v[i] + "')</span>"
+					if logicOr {
+						viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
+					} else {
+						viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
+					}
+				} else if k == "search-phys-description" {
+					if cur == "" {
+						continue
+					}
+					condition := Condition{
+						key: "phys_description like ", value: "%" + v[i] + "%"}
+					conditions = append(conditions, condition)
+					viewOps = viewOps + " <span style=\"color:#00ff00\">contains(phys_description='" + v[i] + "')</span>"
+					if logicOr {
+						viewOps = viewOps + " <span style=\"color:#2222ff\">or</span>"
+					} else {
+						viewOps = viewOps + " <span style=\"color:#2222ff\">and</span>"
+					}
+				}  else {
+					viewOps = " <span style=\"color:#ff0000\">Error(" + k + "=" + v[i] + ")</span>"
+				}
+			}				
+		}
+		if logicOr {
+			viewOps = strings.TrimRight(viewOps, " <span style=\"color:#2222ff\">or</span>")
 		} else {
-			items = getItems("type")
+			viewOps = strings.TrimRight(viewOps, " <span style=\"color:#2222ff\">and</span>")
 		}
-		types, _ := getDistinctCol("type")
-		manufacturers, _ := getDistinctCol("manufacturer")
-		viewData := ViewPageFields{
-				Prefix:			invPrefix,
-				UserName: 		userName.(string),
-				ViewTitle:		"List Items",
-				Data: 			items,
-				Types:			types,
-				Manufacturers:	manufacturers,
-		}
-		if viewOps != "" {
-			viewData.ViewOps = template.HTML(viewOps)
-		} else {
-			viewData.ViewOps = "All Items"
-		}
-		
-		t.Execute(w, viewData)
+		items = getItemsFiltered("type", logicOr, conditions...)
+	} else {
+		items = getItems("type")
 	}
+	types, _ := getDistinctCol("type")
+	manufacturers, _ := getDistinctCol("manufacturer")
+	viewData := ViewPageFields{
+			Prefix:			invPrefix,
+			UserName: 		userName.(string),
+			ViewTitle:		"List Items",
+			Data: 			items,
+			Types:			types,
+			Manufacturers:	manufacturers,
+	}
+	if viewOps != "" {
+		viewData.ViewOps = template.HTML(viewOps)
+	} else {
+		viewData.ViewOps = "All Items"
+	}
+	
+	t.Execute(w, viewData)
 }
 
 func ItemPage(w http.ResponseWriter, r *http.Request) {
-	s := session.Get(r)
-	if s == nil {
-		http.Redirect(w, r, invPrefix + "/login", 301)
+	if !checkSession(w, r) {
 		return
 	}
+	s := session.Get(r)
 	var itemID string
 	if r.Method == "GET" {
 		itemID = r.URL.Query().Get("id")
@@ -294,7 +292,7 @@ func ItemPage(w http.ResponseWriter, r *http.Request) {
 		itemID = r.FormValue("id")
 	}
 	if itemID == "" {
-		t, _ := template.ParseFiles("templates/message.gtpl")
+		t, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 		msg := MessagePage{
 				Prefix: invPrefix,
 				Header: "Missing Item ID",
@@ -304,10 +302,10 @@ func ItemPage(w http.ResponseWriter, r *http.Request) {
 		}
 		t.Execute(w, msg)
 	} else {
-		t, _ := template.ParseFiles("templates/item.gtpl")
+		t, _ := template.ParseFiles(invTemplatePath + "/item.gtpl")
 		item, invEntries, err := getItem(itemID)
 		if item == nil || err != nil {
-			errT, _ := template.ParseFiles("templates/message.gtpl")
+			errT, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 			msg := MessagePage{
 					Prefix: invPrefix,
 					Header: "Failed to Process Item",
@@ -333,9 +331,7 @@ func ItemPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteHandler(w http.ResponseWriter, r *http.Request) {
-	s := session.Get(r)
-	if s == nil {
-		http.Redirect(w, r, invPrefix + "/login", 301)
+	if !checkSession(w, r) {
 		return
 	}
 	var itemID string
@@ -345,7 +341,7 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		itemID = r.FormValue("id")
 	}
 	if itemID == "" {
-		t, _ := template.ParseFiles("templates/message.gtpl")
+		t, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 		msg := MessagePage{
 				Prefix: invPrefix,
 				Header: "Missing Item ID",
@@ -358,7 +354,7 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		item, _, _ := getItem(itemID)
 		err := deleteItem(itemID)
 		if err != nil {
-			errT, _ := template.ParseFiles("templates/message.gtpl")
+			errT, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 			msg := MessagePage{
 					Prefix: invPrefix,
 					Header: "Failed to Process Item",
@@ -374,21 +370,20 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
-	s := session.Get(r)
-	if s == nil {
-		http.Redirect(w, r, invPrefix + "/login", 301)
+	if !checkSession(w, r) {
 		return
 	}
+	s := session.Get(r)
 	var itemID string
 	if r.Method == "GET" {
 		itemID = r.URL.Query().Get("id")
 	} else {
 		itemID = r.FormValue("id")
 	}
-	t, _ := template.ParseFiles("templates/edit.gtpl")
+	t, _ := template.ParseFiles(invTemplatePath + "/edit.gtpl")
 	item, invEntries, err := getItem(itemID)
 	if itemID == "" || err != nil {
-		errT, _ := template.ParseFiles("templates/message.gtpl")
+		errT, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 		msg := MessagePage{
 				Prefix: invPrefix,
 				Header: "Failed to Process Item",
@@ -411,7 +406,7 @@ func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
 		}
 		t.Execute(w, fields)
 	} else {
-		strFooter := " <button onclick=\"window.location.href='./browse'; return false\">Cancel</button>"
+		strFooter := " <button onclick=\"window.location.href='" + invPrefix + "/browse'; return false\">Cancel</button>"
 		intItemID, _ := strconv.Atoi(itemID)
 		fields := AddEditPageFields {
 			Prefix:		invPrefix,
@@ -426,15 +421,14 @@ func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func BrowsePage(w http.ResponseWriter, r *http.Request) {
-	s := session.Get(r)
-	if s == nil {
-		http.Redirect(w, r, invPrefix + "/login", 301)
+	if !checkSession(w, r) {
 		return
 	}
+	s := session.Get(r)
 	userName := s.CAttr("UserName").(string)
 	types, err := getDistinctCol("type")	
 	if err != nil {
-		errT, _ := template.ParseFiles("templates/message.gtpl")
+		errT, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 		msg := MessagePage{
 				Prefix: invPrefix,
 				Header: "Failed to Get Item Types",
@@ -448,7 +442,7 @@ func BrowsePage(w http.ResponseWriter, r *http.Request) {
 	}
 	manufacturers, err := getDistinctCol("manufacturer")
 	if err != nil {
-		errT, _ := template.ParseFiles("templates/message.gtpl")
+		errT, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 		msg := MessagePage{
 				Prefix: invPrefix,
 				Header: "Failed to Get Item Types",
@@ -473,7 +467,7 @@ func BrowsePage(w http.ResponseWriter, r *http.Request) {
 		subtypes, err := getDistinctCol("subtype", condition)
 		typeManufacturers, _ := getDistinctCol("manufacturer", condition)
 		if err != nil {
-			errT, _ := template.ParseFiles("templates/message.gtpl")
+			errT, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 			msg := MessagePage{
 					Prefix: invPrefix,
 					Header: "Failed to Get Subtypes",
@@ -489,18 +483,17 @@ func BrowsePage(w http.ResponseWriter, r *http.Request) {
 		browsePageFields.Types[i].Manufacturers = typeManufacturers
 	}
 	
-	t, _ := template.ParseFiles("templates/browse.gtpl")
+	t, _ := template.ParseFiles(invTemplatePath + "/browse.gtpl")
 	t.Execute(w, browsePageFields)
 }
 
 func SearchHandler(w http.ResponseWriter, r *http.Request) {
-	s := session.Get(r)
-	if s == nil {
-		http.Redirect(w, r, invPrefix + "/login", 301)
+	if !checkSession(w, r) {
 		return
 	}
+	s := session.Get(r)
 	if r.Method == "GET" {
-		t, _ := template.ParseFiles("templates/search.gtpl")
+		t, _ := template.ParseFiles(invTemplatePath + "/search.gtpl")
 		userName := s.CAttr("UserName").(string)
 		searchPageFields := SearchPage{invPrefix, userName}
 		t.Execute(w, searchPageFields)
@@ -522,16 +515,14 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func CommitItemHandler(w http.ResponseWriter, r *http.Request) {
-	s := session.Get(r)
-	if s == nil {
-		http.Redirect(w, r, "./login", 301)
+	if !checkSession(w, r) {
 		return
 	}
 	if r.Method == "POST" {
 		itemID := r.FormValue("id")
 		intItemID, err := strconv.Atoi(itemID)
 		if err != nil {
-			errT, _ := template.ParseFiles("templates/message.gtpl")
+			errT, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 			msg := MessagePage{
 					Prefix: invPrefix,
 					Header: "Failed to Process Item",
@@ -559,7 +550,7 @@ func CommitItemHandler(w http.ResponseWriter, r *http.Request) {
 		item.Value = r.FormValue("value")
 		err = addUpdateItem(item)
 		if err != nil {
-			errT, _ := template.ParseFiles("templates/message.gtpl")
+			errT, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 			msg := MessagePage{
 					Prefix: invPrefix,
 					Header: "Failed to Process Item",
@@ -575,9 +566,7 @@ func CommitItemHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func QtyPostHandler(w http.ResponseWriter, r *http.Request) {
-	s := session.Get(r)
-	if s == nil {
-		http.Redirect(w, r, "./login", 301)
+	if !checkSession(w, r) {
 		return
 	}
 	if r.Method == "POST" {
@@ -586,7 +575,7 @@ func QtyPostHandler(w http.ResponseWriter, r *http.Request) {
 		quantity := r.FormValue("quantity")
 		err := updateInventory(itemID, location, quantity)
 		if err != nil {
-			errT, _ := template.ParseFiles("templates/message.gtpl")
+			errT, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 			msg := MessagePage{
 					Prefix: invPrefix,
 					Header: "Failed to Process Item",
@@ -602,9 +591,7 @@ func QtyPostHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteEntryHandler(w http.ResponseWriter, r *http.Request) {
-	s := session.Get(r)
-	if s == nil {
-		http.Redirect(w, r, "./login", 301)
+	if !checkSession(w, r) {
 		return
 	}
 	var itemID string
@@ -618,7 +605,7 @@ func DeleteEntryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Println("itemID =", itemID, "location =", location)
 	if itemID == "" || location == "" {
-		t, _ := template.ParseFiles("templates/message.gtpl")
+		t, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 		msg := MessagePage{
 				Prefix: invPrefix,
 				Header: "Missing Fields",
@@ -630,7 +617,7 @@ func DeleteEntryHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		err := deleteInventoryEntry(itemID, location)
 		if err != nil {
-			errT, _ := template.ParseFiles("templates/message.gtpl")
+			errT, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 			msg := MessagePage{
 					Prefix: invPrefix,
 					Header: "Failed to Process Item",
@@ -646,9 +633,7 @@ func DeleteEntryHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func AddEntryHandler(w http.ResponseWriter, r *http.Request) {
-	s := session.Get(r)
-	if s == nil {
-		http.Redirect(w, r, "./login", 301)
+	if !checkSession(w, r) {
 		return
 	}
 	var itemID string
@@ -662,7 +647,7 @@ func AddEntryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Println("itemID =", itemID, "location =", location)
 	if itemID == "" || location == "" {
-		t, _ := template.ParseFiles("templates/message.gtpl")
+		t, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 		msg := MessagePage{
 				Prefix: invPrefix,
 				Header: "Missing Fields",
@@ -674,7 +659,7 @@ func AddEntryHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		err := addInventoryEntry(itemID, location, "0")
 		if err != nil {
-			errT, _ := template.ParseFiles("templates/message.gtpl")
+			errT, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 			msg := MessagePage{
 					Prefix: invPrefix,
 					Header: "Failed to Process Item",
@@ -690,9 +675,7 @@ func AddEntryHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func DownloadItemsHandler(w http.ResponseWriter, r *http.Request) {
-	s := session.Get(r)
-	if s == nil {
-		http.Redirect(w, r, "./login", 301)
+	if !checkSession(w, r) {
 		return
 	}
 	now := time.Now()
@@ -709,9 +692,7 @@ func DownloadItemsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func DownloadInventoryHandler(w http.ResponseWriter, r *http.Request) {
-	s := session.Get(r)
-	if s == nil {
-		http.Redirect(w, r, "./login", 301)
+	if !checkSession(w, r) {
 		return
 	}
 	now := time.Now()
@@ -727,9 +708,28 @@ func DownloadInventoryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func checkSession(w http.ResponseWriter, r *http.Request) bool {
+	s := session.Get(r)
+	if s == nil {
+		http.Redirect(w, r, invPrefix + "/login", 301)
+		return false
+	}
+	if s.CAttr("Inventory") == nil {
+		http.Redirect(w, r, invPrefix + "/login", 301)
+		return false
+	}
+	inventoryToken := s.CAttr("Inventory").(string)
+	if inventoryToken != "Yes" {
+		http.Redirect(w, r, invPrefix + "/login", 301)
+		return false
+	}
+	return true
+}
+
 func Install(prefix string, usersFile string, templateDir string, staticDir string,
 		dbConf string) (error) {
 	invPrefix = "/" + prefix
+	invTemplatePath = templateDir
 	fmt.Println("Installing inventory handlers to '" + prefix + "'")
 	// check for template files
 	templates := []string{"browse.gtpl", "edit.gtpl", "item.gtpl",
