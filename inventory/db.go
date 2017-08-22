@@ -4,8 +4,10 @@ import (
 	"io"
 	"fmt"
 	"log"
+	"errors"
 	"strings"
 	"strconv"
+	"database/sql"
 	"encoding/csv"
 )
 
@@ -83,48 +85,63 @@ func deleteAllItemEntries(itemID string) (error) {
 	return err
 }
 
-func addUpdateItem(item Item) (error) {
-	query := "select count(*) from items where itemID=" + 
-		strconv.Itoa(item.ItemID)
-	var rows int
-	err := invDB.QueryRow(query).Scan(&rows)
-	if err != nil {
-		return err
-	}
+func addUpdateItem(item Item, newItem bool) (error, int) {
+	rowCount := 0
+	itemID := -1
+	if !newItem {
+		query := "select count(*) from items where itemID=" + 
+			strconv.Itoa(item.ItemID)
+		err := invDB.QueryRow(query).Scan(&rowCount)
+		if err != nil {
+			return err, itemID
+		}
+	}	
 	var queryStr string
-	if rows == 0 {
+	if rowCount == 0 || newItem {
 		queryStr = "insert into items(" +
-			"itemID, descriptive_name, model_number, manufacturer, " +
+			"descriptive_name, model_number, manufacturer, " +
 			"type, subtype, " +
 			"phys_description, datasheetURL, productURL, seller1URL, " +
 			"seller2URL, seller3URL, unitPrice, notes, value) values ( " +
 			"$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, " +
-			"$13, $14, $15)"
+			"$13, $14) returning itemID;"
+		err := invDB.QueryRow(queryStr,
+				item.Descriptive_name, item.Model_number,
+				item.Manufacturer, item.Type, item.Subtype,
+				item.Phys_description, item.DatasheetURL,
+				item.ProductURL, item.Seller1URL, item.Seller2URL,
+				item.Seller3URL, item.UnitPrice, item.Notes, item.Value).Scan(&itemID)
+		if err != nil {
+			fmt.Println("Add Item failed on stmt.Exec", err.Error())
+			return err, itemID
+		}		
 	} else {
+		itemID = item.ItemID
 		queryStr = "update items set " +
-			"itemID=$1, descriptive_name=$2, model_number=$3, " +
+			"descriptive_name=$2, model_number=$3, " +
 			"manufacturer=$4, type=$5, subtype=$6, " +
 			"phys_description=$7, datasheetURL=$8, productURL=$9, " +
 			"seller1URL=$10, seller2URL=$11, seller3URL=$12, " +
 			"unitPrice=$13, notes=$14, value=$15" +
 			"where itemID=$1"
+		stmt, err := invDB.Prepare(queryStr)
+		if err != nil {
+			fmt.Println("Update Item failed on invDB.Prepare:", err.Error())
+			return err, itemID
+		}
+		_, err = stmt.Exec(
+				itemID, item.Descriptive_name, item.Model_number,
+				item.Manufacturer, item.Type, item.Subtype,
+				item.Phys_description, item.DatasheetURL,
+				item.ProductURL, item.Seller1URL, item.Seller2URL,
+				item.Seller3URL, item.UnitPrice, item.Notes, item.Value)
+		if err != nil {
+			fmt.Println("Update Item failed on stmt.Exec", err.Error())
+			return err, itemID
+		}
 	}
-	stmt, err := invDB.Prepare(queryStr)
-	if err != nil {
-		fmt.Println("Add Item failed on invDB.Prepare:", err.Error())
-		return err
-	}
-	_, err = stmt.Exec(
-			strconv.Itoa(item.ItemID), item.Descriptive_name, item.Model_number,
-			item.Manufacturer, item.Type, item.Subtype,
-			item.Phys_description, item.DatasheetURL,
-			item.ProductURL, item.Seller1URL, item.Seller2URL,
-			item.Seller3URL, item.UnitPrice, item.Notes, item.Value)
-	if err != nil {
-		fmt.Println("Add Item failed on stmt.Exec", err.Error())
-		return err
-	}
-	return nil
+	
+	return nil, itemID
 }
 
 func deleteItem(itemID string) (error) {
@@ -219,7 +236,7 @@ func getItemsFiltered(order string, or bool, conditions...Condition) []Item {
 		stmt = stmt + " where ("
 		for i := range conditions {
 			count := strconv.Itoa(i+1)
-			// we're assuming the Key has been sanitized here!
+			// we're assuming the Key did NOT come from the user here!
 			stmt = stmt + conditions[i].key + "$" + count + logicOp
 			values[i] = conditions[i].value
 		}
@@ -321,10 +338,184 @@ func getInventoryEntries(id int) []InventoryEntry {
 	return list
 }
 
-func ExportItems(f io.Writer) (error) {
+func CreateTables(db *sql.DB) (error) {
+	stmt := `
+	CREATE TABLE items (  
+		id SERIAL PRIMARY KEY,
+		itemID SERIAL,
+		descriptive_name TEXT,
+		model_number TEXT,
+		manufacturer TEXT,
+		type TEXT,
+		subtype TEXT,
+		phys_description TEXT,
+		datasheetURL TEXT,
+		productURL TEXT,
+		seller1URL TEXT,
+		seller2URL TEXT,
+		seller3URL TEXT,
+		unitPrice NUMERIC(8,2),
+		notes TEXT,
+		value NUMERIC(12,6)
+	);`
+	_, err := db.Exec(stmt)
+	if err != nil {
+		return err
+	}
+	stmt = `
+		CREATE TABLE inventory (
+			id SERIAL PRIMARY KEY,
+			itemID INTEGER,
+			location TEXT,
+			quantity INTEGER
+		);`
+	_, err = db.Exec(stmt)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func DeleteTables(db *sql.DB) (error) {
+	stmt := `DROP TABLE items`
+	_, err := db.Exec(stmt)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	stmt = `DROP TABLE inventory`
+	_, err = db.Exec(stmt)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	return nil
+}
+
+func ImportInventory(f io.Reader, db *sql.DB) (error) {
+	lines, err := csv.NewReader(f).ReadAll()
+	if err != nil {
+		return err
+	}
+	for i := range lines {
+		tokens := lines[i]
+		if err != nil || len(tokens) != 3 {
+			return errors.New("Invalid Inventory File Format tokens=" +
+				strconv.Itoa(len(tokens)))
+		}
+		itemID, err := strconv.Atoi(tokens[0])
+		if err != nil {
+			fmt.Println("Failed to parse item ID column")
+			return err
+		}
+		number, err := strconv.Atoi(tokens[2])
+		if err != nil {
+			fmt.Println("Failed to parse number column")
+			return err
+		}
+		// check if we just need to change the total number
+		query := "select count(*) from inventory where " +
+			"(itemID=" + tokens[0] + " and location='" +
+			tokens[1] + "')"
+		var rows int
+		err = db.QueryRow(query).Scan(&rows)
+		if rows > 0 {
+			fmt.Println(tokens[0] + " in '" + tokens[1] + "' " +
+				"already defined, changing number only")
+			stmt, err := db.Prepare("update inventory set " +
+				"quantity=$1 where (itemID=" + tokens[0] + " and " +
+				"location='" + tokens[1] + "')")
+			if err != nil {
+				fmt.Println("Inventory Import Failed")
+				return err
+			}
+			_, err = stmt.Exec(number)
+			if err != nil {
+				fmt.Println("Inventory Import Failed")
+				return err
+			}
+		} else {
+			stmt, err := db.Prepare("insert into inventory(" +
+				"itemID, location, quantity) values(" +
+				"$1, $2, $3)")
+			if err != nil {
+				fmt.Println("Inventory Import Failed")
+				return err
+			}
+			_, err = stmt.Exec(itemID, tokens[1], number)
+			if err != nil {
+				fmt.Println("Inventory Import Failed")
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func ImportItems(f io.Reader, db *sql.DB) (error) {
+	lines, err := csv.NewReader(f).ReadAll()
+	if err != nil {
+		log.Fatal(err)
+	}
+	for i := range lines {
+		tokens := lines[i]
+		if err != nil || len(tokens) != 15 {			
+			return err
+		} else if len(tokens) != 15 {
+			return errors.New("Invalid Items File Format tokens=" + 
+				strconv.Itoa(len(tokens)))
+		}
+		fPrice, err := strconv.ParseFloat(tokens[12], 32)
+		if err != nil {
+			fmt.Println("Failed to parse unit price column")
+			return err
+		}
+		// check if item is already defined
+		query := "select count(*) from items where itemID=" + tokens[0]
+		var rows int
+		err = db.QueryRow(query).Scan(&rows)
+		if err != nil {
+			fmt.Println("Items Import failed:", err.Error())
+			return err
+		}
+		if rows > 0 {
+			fmt.Println(tokens[0], "is already defined")
+			continue
+		}
+		stmt, err := db.Prepare("insert into items(" +
+			"itemID, descriptive_name, model_number, manufacturer, " +
+			"type, subtype, " +
+			"phys_description, datasheetURL, productURL, seller1URL, " +
+			"seller2URL, seller3URL, unitPrice, notes, value) values( " +
+			"$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, " +
+			"$13, $14, $15)")
+		if err != nil {
+			fmt.Println("Items Import failed:", err.Error())
+			return err
+		}
+		_, err = stmt.Exec(
+			tokens[0], tokens[1], tokens[2], tokens[3], tokens[4],
+			tokens[5], tokens[6], tokens[7], tokens[8], tokens[9],
+			tokens[10], tokens[11], fPrice, tokens[13], tokens[14])
+		if err != nil {
+			fmt.Println("Items Import failed:", err.Error())
+			return err
+		}
+		// set sequence to max
+		query = "SELECT setval(pg_get_serial_sequence('items', 'itemid'), coalesce(max(itemID),0) + 1, false) FROM items;"
+		_, err = db.Query(query)
+		if err != nil {
+			fmt.Println("Items Import failed:", err.Error())
+			return err
+		}
+	}
+	return nil
+}
+
+func ExportItems(f io.Writer, db *sql.DB) (error) {
 	w := csv.NewWriter(f)
 	defer w.Flush()
-	rows, err := invDB.Query("select * from items")
+	rows, err := db.Query("select * from items")
 	if err != nil {
 		return err
 	}
@@ -342,7 +533,7 @@ func ExportItems(f io.Writer) (error) {
 			&item.Value,
 			)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		line := make([]string, 15)
 		line[0] = strconv.Itoa(item.ItemID)
@@ -365,10 +556,10 @@ func ExportItems(f io.Writer) (error) {
 	return nil
 }
 
-func ExportInventory(f io.Writer) (error) {
+func ExportInventory(f io.Writer, db *sql.DB) (error) {
 	w := csv.NewWriter(f)
 	defer w.Flush()
-	rows, err := invDB.Query("select * from inventory")
+	rows, err := db.Query("select * from inventory")
 	if err != nil {
 		return err
 	}
@@ -378,7 +569,7 @@ func ExportInventory(f io.Writer) (error) {
 		err := rows.Scan(&entry.Serial,
 			&entry.ItemID, &entry.Location, &entry.Quantity)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		line := make([]string, 3)
 		line[0] = strconv.Itoa(entry.ItemID)

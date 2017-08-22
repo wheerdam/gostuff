@@ -4,9 +4,7 @@ import (
 	"os"
 	"fmt"
 	"log"
-	"strconv"
 	"net/http"
-	"encoding/csv"
 	"bbi/netutil"
 	"bbi/inventory"	
 )
@@ -168,50 +166,14 @@ func handleDbOps() {
 	
 	switch command {
 	case "create-tables":		
-		stmt := `
-			CREATE TABLE items (  
-				id SERIAL PRIMARY KEY,
-				itemID INTEGER,
-				descriptive_name TEXT,
-				model_number TEXT,
-				manufacturer TEXT,
-				type TEXT,
-				subtype TEXT,
-				phys_description TEXT,
-				datasheetURL TEXT,
-				productURL TEXT,
-				seller1URL TEXT,
-				seller2URL TEXT,
-				seller3URL TEXT,
-				unitPrice NUMERIC(8,2),
-				notes TEXT,
-				value NUMERIC(12,6)
-			);`
-		_, err = db.Exec(stmt)
+		err := inventory.CreateTables(db)
 		if err != nil {
-			fmt.Println(err)
-		}
-		stmt = `
-			CREATE TABLE inventory (
-				id SERIAL PRIMARY KEY,
-				itemID INTEGER,
-				location TEXT,
-				quantity INTEGER
-			);`
-		_, err = db.Exec(stmt)
-		if err != nil {
-			fmt.Println(err)
+			log.Fatal(err)
 		}
 	case "delete-tables":
-		stmt := `DROP TABLE items`
-		_, err = db.Exec(stmt)
+		err := inventory.DeleteTables(db)
 		if err != nil {
-			fmt.Println(err)
-		}
-		stmt = `DROP TABLE inventory`
-		_, err = db.Exec(stmt)
-		if err != nil {
-			fmt.Println(err)
+			log.Fatal(err)
 		}
 	case "import-inventory":
 		if len(params) != 1 {
@@ -223,61 +185,9 @@ func handleDbOps() {
 			log.Fatal(err)
 		}
 		defer file.Close()
-		lines, err := csv.NewReader(file).ReadAll()
+		err = inventory.ImportInventory(file, db)
 		if err != nil {
 			log.Fatal(err)
-		}
-		for i := range lines {
-			tokens := lines[i]
-			if err != nil || len(tokens) != 3 {
-				fmt.Println("Invalid Inventory File Format tokens=", len(tokens))
-				return
-			}
-			itemID, err := strconv.Atoi(tokens[0])
-			if err != nil {
-				fmt.Println("Failed to parse item ID column")
-				return
-			}
-			number, err := strconv.Atoi(tokens[2])
-			if err != nil {
-				fmt.Println("Failed to parse number column")
-				return
-			}
-			// check if we just need to change the total number
-			query := "select count(*) from inventory where " +
-				"(itemID=" + tokens[0] + " and location='" +
-				tokens[1] + "')"
-			var rows int
-			err = db.QueryRow(query).Scan(&rows)
-			if rows > 0 {
-				fmt.Println(tokens[0] + " in '" + tokens[1] + "' " +
-					"already defined, changing number only")
-				stmt, err := db.Prepare("update inventory set " +
-					"quantity=$1 where (itemID=" + tokens[0] + " and " +
-					"location='" + tokens[1] + "')")
-				if err != nil {
-					fmt.Println("Inventory Import Failed")
-					return
-				}
-				_, err = stmt.Exec(number)
-				if err != nil {
-					fmt.Println("Inventory Import Failed")
-					return
-				}
-			} else {
-				stmt, err := db.Prepare("insert into inventory(" +
-					"itemID, location, quantity) values(" +
-					"$1, $2, $3)")
-				if err != nil {
-					fmt.Println("Inventory Import Failed")
-					return
-				}
-				_, err = stmt.Exec(itemID, tokens[1], number)
-				if err != nil {
-					fmt.Println("Inventory Import Failed")
-					return
-				}
-			}
 		}
 	case "import-items":
 		if len(params) != 1 {
@@ -289,52 +199,9 @@ func handleDbOps() {
 			log.Fatal(err)
 		}
 		defer file.Close()
-		lines, err := csv.NewReader(file).ReadAll()
+		err = inventory.ImportItems(file, db)
 		if err != nil {
 			log.Fatal(err)
-		}
-		for i := range lines {
-			tokens := lines[i]
-			if err != nil || len(tokens) != 15 {
-				fmt.Println("Invalid Items File Format tokens=", len(tokens))
-				return
-			}
-			fPrice, err := strconv.ParseFloat(tokens[12], 32)
-			if err != nil {
-				fmt.Println("Failed to parse unit price column")
-				return
-			}
-			// check if item is already defined
-			query := "select count(*) from items where itemID=" + tokens[0]
-			var rows int
-			err = db.QueryRow(query).Scan(&rows)
-			if err != nil {
-				fmt.Println("Items Import failed:", err.Error())
-				return
-			}
-			if rows > 0 {
-				fmt.Println(tokens[0], "is already defined")
-				continue
-			}
-			stmt, err := db.Prepare("insert into items(" +
-				"itemID, descriptive_name, model_number, manufacturer, " +
-				"type, subtype, " +
-				"phys_description, datasheetURL, productURL, seller1URL, " +
-				"seller2URL, seller3URL, unitPrice, notes, value) values( " +
-				"$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, " +
-				"$13, $14, $15)")
-			if err != nil {
-				fmt.Println("Items Import failed:", err.Error())
-				return
-			}
-			_, err = stmt.Exec(
-				tokens[0], tokens[1], tokens[2], tokens[3], tokens[4],
-				tokens[5], tokens[6], tokens[7], tokens[8], tokens[9],
-				tokens[10], tokens[11], fPrice, tokens[13], tokens[14])
-			if err != nil {
-				fmt.Println("Items Import failed:", err.Error())
-				return
-			}
 		}
 	case "list-inventory":
 		rows, err := db.Query("select * from inventory")
@@ -389,7 +256,7 @@ func handleDbOps() {
 			log.Fatal(err)
 		}
 		defer f.Close()
-		err = inventory.ExportInventory(f)
+		err = inventory.ExportInventory(f, db)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -403,7 +270,7 @@ func handleDbOps() {
 			log.Fatal(err)
 		}
 		defer f.Close()
-		err = inventory.ExportItems(f)				
+		err = inventory.ExportItems(f, db)				
 		if err != nil {
 			log.Fatal(err)
 		}

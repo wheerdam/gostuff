@@ -29,7 +29,7 @@
 				<p><label for="price">Unit Price:</label><input id="price" size="60" type="text" name="unitprice" value="{{.Info.UnitPrice}}"></p>
 				<p><label for="notes">Notes:</label><input id="notes" size="60" type="text" name="notes" value="{{.Info.Notes}}"></p>
 				<p><label for="value">Value:</label><input id="value" size="60" type="text" name="value" value="{{.Info.Value}}"></p>
-				
+				<input type="hidden" name="opts" value="{{.CommitOpts}}">
 			</form>
 			</table>
 			<h2>Inventory Locations:</h2>

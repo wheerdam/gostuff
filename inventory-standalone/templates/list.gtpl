@@ -23,11 +23,12 @@
 			
 			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
 			<p>
-			<form action="{{$.Prefix}}/item" method="post" style="margin: 0px; padding: 0px">
+			<form action="{{.Prefix}}/item" method="post" style="margin: 0px; padding: 0px">
 				<label for="one" style="margin-left: 5px; margin-right: 5px">View Item ID:</label>
 				<input id="one" size="20" type="text" name="id"  style="margin:0px">
-				<input type="submit" value="View / Add" style="margin:0px">
-			</form>
+				<input type="submit" value="View" style="margin:0px">
+				<a href="{{.Prefix}}/edit">Add</a>
+			</form>			
 			</p>
 			</div>
 			

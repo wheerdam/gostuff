@@ -30,6 +30,16 @@
 			<button onclick="window.location.href='./edit?id={{.Info.ItemID}}'">Edit this Item</button>
 			<button onclick="deleteItem()">Delete Item</button>
 			</div>
+			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
+			<p>
+			<form action="{{.Prefix}}/item" method="post" style="margin: 0px; padding: 0px">
+				<label for="one" style="margin-left: 5px; margin-right: 5px">View Item ID:</label>
+				<input id="one" size="20" type="text" name="id"  style="margin:0px">
+				<input type="submit" value="View" style="margin:0px">
+				<a href="{{.Prefix}}/edit">Add</a>
+			</form>			
+			</p>
+			</div>
 			<table width="100%">
 			<tr><td style="white-space: nowrap">Part Number</td><td width="100%">{{.Info.Model_number}}</td></tr>
 			<tr><td style="white-space: nowrap">Manufacturer</td><td><a href="{{.Prefix}}/list?manufacturer={{.Info.Manufacturer}}">{{.Info.Manufacturer}}</a></td></tr>

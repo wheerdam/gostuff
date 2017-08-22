@@ -40,6 +40,7 @@ type AddEditPageFields struct {
 	Prefix		string
 	UserName	string
 	Header		string
+	CommitOpts	string
 	Info		*Item
 	InvEntries	[]InventoryEntry
 	Footer		interface{}
@@ -311,8 +312,7 @@ func ItemPage(w http.ResponseWriter, r *http.Request) {
 					Header: "Failed to Process Item",
 					Message: template.HTML(
 							"<p>ItemID: " + itemID + "</p>" +
-							"<p><a href=\"" + invPrefix + "/edit?id=" + itemID + 
-							"\">Add this Item</a> - " + 
+							"<p><a href=\"" + invPrefix + "/edit\">Add an Item</a> - " + 
 							"<a href=\"" + invPrefix + "/browse\">Browse</a> - <a href=\"" + invPrefix + "/list\">View All Items</a></p>",
 					),
 			}
@@ -382,7 +382,7 @@ func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
 	}
 	t, _ := template.ParseFiles(invTemplatePath + "/edit.gtpl")
 	item, invEntries, err := getItem(itemID)
-	if itemID == "" || err != nil {
+	if err != nil && itemID != "" {
 		errT, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 		msg := MessagePage{
 				Prefix: invPrefix,
@@ -395,7 +395,7 @@ func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if item != nil {
-		strFooter := " <button onclick=\"history.back()\">Cancel</button>"
+		strFooter := " <button onclick=\"window.location.href='" + invPrefix + "/item?id=" + itemID + "'\">Cancel</button>"
 		fields := AddEditPageFields {
 			Prefix:		invPrefix,
 			UserName:	s.CAttr("UserName").(string),
@@ -403,18 +403,19 @@ func AddEditItemPage(w http.ResponseWriter, r *http.Request) {
 			Info:		item,
 			InvEntries:	invEntries,
 			Footer:		template.HTML(strFooter),
+			CommitOpts: "edit",
 		}
 		t.Execute(w, fields)
 	} else {
 		strFooter := " <button onclick=\"window.location.href='" + invPrefix + "/browse'; return false\">Cancel</button>"
-		intItemID, _ := strconv.Atoi(itemID)
 		fields := AddEditPageFields {
 			Prefix:		invPrefix,
 			UserName:	s.CAttr("UserName").(string),
-			Header:		"Add Item #" + itemID,
-			Info:		&Item{ItemID: intItemID},
+			Header:		"Add Item",
+			Info:		&Item{ItemID: -1},
 			InvEntries:	make([]InventoryEntry, 0),
 			Footer:		template.HTML(strFooter),
+			CommitOpts: "add",
 		}
 		t.Execute(w, fields)
 	}
@@ -520,6 +521,7 @@ func CommitItemHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == "POST" {
 		itemID := r.FormValue("id")
+		opts := r.FormValue("opts")
 		intItemID, err := strconv.Atoi(itemID)
 		if err != nil {
 			errT, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
@@ -548,7 +550,8 @@ func CommitItemHandler(w http.ResponseWriter, r *http.Request) {
 		item.UnitPrice = r.FormValue("unitprice")
 		item.Notes = r.FormValue("notes")
 		item.Value = r.FormValue("value")
-		err = addUpdateItem(item)
+		err, retItemID := addUpdateItem(item, opts == "add")
+		strItemID := strconv.Itoa(retItemID)
 		if err != nil {
 			errT, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 			msg := MessagePage{
@@ -560,7 +563,7 @@ func CommitItemHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			errT.Execute(w, msg)
 		} else {
-			http.Redirect(w, r, invPrefix + "/item?id=" + itemID, 301)			
+			http.Redirect(w, r, invPrefix + "/item?id=" + strItemID, 301)			
 		}
 	}
 }
@@ -685,7 +688,7 @@ func DownloadItemsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", "attachment;filename=items-" +
 		timestamp + ".csv")
-	err := ExportItems(w)
+	err := ExportItems(w, invDB)
 	if err != nil {
 		// oh wow
 	}
@@ -702,7 +705,7 @@ func DownloadInventoryHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", "attachment;filename=inventory-" +
 		timestamp + ".csv")
-	err := ExportInventory(w)
+	err := ExportInventory(w, invDB)
 	if err != nil {
 		// oh wow
 	}
