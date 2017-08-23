@@ -32,27 +32,6 @@
 				<input type="hidden" name="opts" value="{{.CommitOpts}}">
 			</form>
 			</table>
-			<h2>Inventory Locations:</h2>
-			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
-			<form action="{{.Prefix}}/add-entry" method="post">
-				<p><input size="10" type="text" readonly="readonly" name="id" value="{{.Info.ItemID}}"></p>
-				<p><label for="location">Add a Location:</label><input id="location" size="60" type="text" name="location">
-				<input type="submit" value="Add"></p>
-				</p>
-			</form>
-			</div>
-			<table width="100%">
-			{{range .InvEntries}}
-			<form action="{{$.Prefix}}/delete-entry" method="post">
-			<tr>
-			<td><input size="10" type="text" readonly="readonly" name="id" value="{{.ItemID}}"></td>
-			<td><input size="30" type="text" readonly="readonly" name="location" value="{{.Location}}"></td>
-			<td><input type="submit" value="Delete Location for this Item"></td>
-			</tr>
-			</form>
-			{{end}}
-			</table>
-			
 		</div>
     </body>
 </html>

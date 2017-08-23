@@ -60,21 +60,37 @@
 			<h2>Inventory Details:</h2>
 			<table width="100%">
 			<tr>
-			<th>Item ID</th>
 			<th>Location</th>
 			<th>Quantity</th>
+			<th>Delete</th>
 			</tr>
 			{{range .InvEntries}}
 			<tr>
-			<form action="{{$.Prefix}}/modify-qty" method="post">
-			<td><input size="10" type="text" name="id" readonly="readonly" value="{{.ItemID}}"></td>
-			<td><input size="30" type="text" name="location" readonly="readonly" value="{{.Location}}"></td>
-			<td><input size="10" type="text" name="quantity" value="{{.Quantity}}">
-			<input type="submit" value="Update"></td>
-			</form>
+				<form action="{{$.Prefix}}/modify-qty" method="post">
+					<td><input type="hidden" name="id" readonly="readonly" value="{{.ItemID}}">
+					<input size="20" type="text" name="location" readonly="readonly" value="{{.Location}}"></td>
+					<td><input size="10" type="text" name="quantity" value="{{.Quantity}}">
+					<input type="submit" value="Update"></td>
+				</form>
+				<form action="{{$.Prefix}}/delete-entry" method="post">
+					<td>
+					<input type="hidden" readonly="readonly" name="id" value="{{.ItemID}}">
+					<input type="hidden" readonly="readonly" name="location" value="{{.Location}}">
+					<input type="submit" value="Delete Location">
+					</td>
+				</form>
 			</tr>
 			{{end}}
 			</table>
+			<div style="border: 1px solid #ababab; padding-left: 10px; margin-bottom: 10px;">
+			<p>
+				<form action="{{.Prefix}}/add-entry" method="post" style="margin: 0px; padding: 0px">
+					<input type="hidden" readonly="readonly" name="id" value="{{.Info.ItemID}}">
+					<label for="location">Add a Location:</label><input id="location" size="20" type="text" name="location">
+					<input type="submit" value="Add">
+				</form>
+			</p>
+			</div>			
 		</div>
     </body>
 </html>
