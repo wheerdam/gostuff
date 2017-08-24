@@ -714,19 +714,32 @@ func DownloadInventoryHandler(w http.ResponseWriter, r *http.Request) {
 func checkSession(w http.ResponseWriter, r *http.Request) bool {
 	s := session.Get(r)
 	if s == nil {
-		http.Redirect(w, r, invPrefix + "/login", 301)
+		messageMustLogin(w, r)
 		return false
 	}
 	if s.CAttr("Inventory") == nil {
-		http.Redirect(w, r, invPrefix + "/login", 301)
+		messageMustLogin(w, r)
 		return false
 	}
 	inventoryToken := s.CAttr("Inventory").(string)
 	if inventoryToken != "Yes" {
-		http.Redirect(w, r, invPrefix + "/login", 301)
+		messageMustLogin(w, r)
 		return false
 	}
 	return true
+}
+
+func messageMustLogin(w http.ResponseWriter, r *http.Request) {
+	t, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
+	msg := MessagePage{
+			Prefix: invPrefix,
+			Header: "Not Logged In",
+			Message: template.HTML(
+					"<p>You must log in to continue</p>" +
+					"<p><a href=\"" + invPrefix + "/login\">Log In</a></p>",
+			),
+	}
+	t.Execute(w, msg)
 }
 
 func Install(prefix string, usersFile string, templateDir string, staticDir string,
