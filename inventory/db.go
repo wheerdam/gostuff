@@ -44,15 +44,47 @@ type Condition struct {
 	value	string
 }
 
-func updateInventory(itemID string, location string, qty string) (error) {
-	stmt, err := invDB.Prepare("update inventory set " +
-		"quantity=$1 where (itemID=$2 and location=$3)")
-	if err != nil {
-		fmt.Println("Inventory Update Failed")
+func updateInventory(itemID string, location string, op string, qty string) (error) {
+	switch op {
+	case "set":
+		stmt, err := invDB.Prepare("update inventory set " +
+			"quantity=$1 where (itemID=$2 and location=$3)")
+		if err != nil {
+			fmt.Println("Inventory Update Failed: " + err.Error())
+			return err
+		}
+		_, err = stmt.Exec(qty, itemID, location)
+		return err
+	case "add":
+		stmt, err := invDB.Prepare("update inventory set " +
+			"quantity=quantity+$1 where (itemID=$2 and location=$3)")
+		if err != nil {
+			fmt.Println("Inventory Update Add Failed: " + err.Error())
+			return err
+		}
+		_, err = stmt.Exec(qty, itemID, location)
+		return err
+	case "remove":
+		stmt, err := invDB.Prepare("update inventory set " +
+			"quantity=quantity-$1 where (itemID=$2 and location=$3)")
+		if err != nil {
+			fmt.Println("Inventory Update Remove Failed: " + err.Error())
+			return err
+		}
+		_, err = stmt.Exec(qty, itemID, location)
 		return err
 	}
-	_, err = stmt.Exec(qty, itemID, location)
-	return err
+	return nil
+}
+
+func getInventory(itemID string, location string) (int, error) {
+	var qty int
+	err := invDB.QueryRow("select quantity from inventory where (" +
+		"itemID=$1 and location=$2)", itemID, location).Scan(&qty)
+	if err != nil {
+		return -1, err
+	}
+	return qty, nil
 }
 
 func addInventoryEntry(itemID string, location string, qty string) (error) {
@@ -89,9 +121,8 @@ func addUpdateItem(item Item, newItem bool) (error, int) {
 	rowCount := 0
 	itemID := -1
 	if !newItem {
-		query := "select count(*) from items where itemID=" + 
-			strconv.Itoa(item.ItemID)
-		err := invDB.QueryRow(query).Scan(&rowCount)
+		query := "select count(*) from items where itemID=$1"
+		err := invDB.QueryRow(query, item.ItemID).Scan(&rowCount)
 		if err != nil {
 			return err, itemID
 		}

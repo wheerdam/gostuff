@@ -52,9 +52,21 @@ type MessagePage struct {
 	Message	 	interface{}
 }
 
-type SearchPage struct {
+type Page struct {
+	Prefix		string
+	UserName	string
+}
+
+type ScanPageFields struct {
 	Prefix			string
 	UserName		string
+	PrevID			string
+	PrevLocation	string
+	PrevQty			string
+	PrevOperation	string
+	PrevMode		string
+	Message			string
+	IDChecked		string
 }
 
 type BrowsePageFields struct {
@@ -73,7 +85,7 @@ type Type struct {
 func LoginPage(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
         t, _ := template.ParseFiles(invTemplatePath + "/login.gtpl")
-        t.Execute(w, SearchPage{invPrefix, ""})
+        t.Execute(w, Page{invPrefix, ""})
     } else {
         r.ParseForm()
         // logic part of log in
@@ -488,6 +500,29 @@ func BrowsePage(w http.ResponseWriter, r *http.Request) {
 	t.Execute(w, browsePageFields)
 }
 
+func ScanPage(w http.ResponseWriter, r *http.Request) {
+	if !checkSession(w, r) {
+		return
+	}
+	s := session.Get(r)
+	userName := s.CAttr("UserName").(string)
+	prevID := r.URL.Query().Get("prevID")
+	prevLocation := r.URL.Query().Get("prevLocation")
+	prevQty := r.URL.Query().Get("prevQty")
+	prevOperation := r.URL.Query().Get("prevOperation")
+	prevMode := r.URL.Query().Get("prevMode")
+	message := r.URL.Query().Get("message")
+	idChecked := ""
+	if prevID != "" {
+		idChecked = "checked"
+	}
+	fields := ScanPageFields{invPrefix, userName,
+		prevID, prevLocation, prevQty, prevOperation, prevMode,
+		message, idChecked}
+	t, _ := template.ParseFiles(invTemplatePath + "/scan.gtpl")
+	t.Execute(w, fields)
+}
+
 func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	if !checkSession(w, r) {
 		return
@@ -496,7 +531,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		t, _ := template.ParseFiles(invTemplatePath + "/search.gtpl")
 		userName := s.CAttr("UserName").(string)
-		searchPageFields := SearchPage{invPrefix, userName}
+		searchPageFields := Page{invPrefix, userName}
 		t.Execute(w, searchPageFields)
 	} else if r.Method == "POST" {
 		qType := r.FormValue("type")
@@ -576,19 +611,59 @@ func QtyPostHandler(w http.ResponseWriter, r *http.Request) {
 		itemID := r.FormValue("id")
 		location := r.FormValue("location")
 		quantity := r.FormValue("quantity")
-		err := updateInventory(itemID, location, quantity)
+		getResults := r.FormValue("getresults")
+		op := r.FormValue("op")
+		keepid := r.FormValue("keepid")
+		if op == "" {
+			op = "set"
+		}
+		done := r.FormValue("done")		
+		prev := r.FormValue("prev")
+		if prev == "yes" && done != "" {
+			if keepid == "yes" {
+				done += "?prevID=" + itemID + "&"
+			} else {
+				done += "?"
+			}
+			done += "prevLocation=" + location +
+				"&prevQty=" + quantity +
+				"&prevOperation=" + op +
+				"&prevMode=yes"
+		}
+		err := updateInventory(itemID, location, op, quantity)		
 		if err != nil {
 			errT, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 			msg := MessagePage{
 					Prefix: invPrefix,
 					Header: "Failed to Process Item",
 					Message: template.HTML(
-							"<p>Error: " + err.Error() + "</p>",
+							"<p>Error: " + err.Error() + "</p>" +
+							"<p><a href=\"" + done + "\">Go Back</a></p>",
 					),
 			}
 			errT.Execute(w, msg)
+		} else if done != "" {
+			if prev == "yes" && getResults == "yes" {
+				qty, err := getInventory(itemID, location)
+				if err != nil {
+					errT, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
+					msg := MessagePage{
+							Prefix: invPrefix,
+							Header: "Failed to Process Item",
+							Message: template.HTML(
+									"<p>Error: " + err.Error() + "</p>" +
+									"<p><a href=\"" + done + "\">Go Back</a></p>",
+							),
+					}
+					errT.Execute(w, msg)
+				}
+				qtyStr := strconv.Itoa(qty)
+				done += "&message=" + itemID + " in " + location +
+					" changed to " + qtyStr
+			}
+			http.Redirect(w, r, done, 307)			
 		} else {
-			http.Redirect(w, r, invPrefix + "/item?id=" + itemID, 301)			
+			// json status
 		}
 	}
 }
@@ -754,7 +829,7 @@ func Install(prefix string, usersFile string, templateDir string, staticDir stri
 	// check for template files
 	templates := []string{"browse.gtpl", "edit.gtpl", "item.gtpl",
 						  "list.gtpl", "login.gtpl", "message.gtpl",
-						  "search.gtpl"}
+						  "search.gtpl", "scan.gtpl"}
 	for _, fileName := range templates {
 		if _, err := os.Stat(templateDir + "/" + fileName); os.IsNotExist(err) {
 			return errors.New(templateDir + "/" + fileName + " does not exist")
@@ -766,6 +841,7 @@ func Install(prefix string, usersFile string, templateDir string, staticDir stri
 	http.HandleFunc(invPrefix+"/logout", LogoutPage)
 	http.HandleFunc(invPrefix+"/item", ItemPage)
 	http.HandleFunc(invPrefix+"/edit", AddEditItemPage)
+	http.HandleFunc(invPrefix+"/scan", ScanPage)
 	http.HandleFunc(invPrefix+"/delete", DeleteHandler)
 	http.HandleFunc(invPrefix+"/commit", CommitItemHandler)
 	http.HandleFunc(invPrefix+"/modify-qty", QtyPostHandler)

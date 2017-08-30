@@ -69,6 +69,7 @@
 				<form action="{{$.Prefix}}/modify-qty" method="post">
 					<td><input type="hidden" name="id" readonly="readonly" value="{{.ItemID}}">
 					<input type="hidden" name="opt" value="set">
+					<input type="hidden" name="done" value="{{$.Prefix}}/item?id={{.ItemID}}">
 					<input size="20" type="text" name="location" readonly="readonly" value="{{.Location}}"></td>
 					<td><input size="10" type="text" name="quantity" value="{{.Quantity}}">
 					<input type="submit" value="Update"></td>
