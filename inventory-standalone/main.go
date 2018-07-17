@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"bbi/netutil"
-	"bbi/inventory"	
+	//"bbi/netutil"
+	//"bbi/inventory"	
+	"github.com/wheerdam/inventory"
+	"github.com/wheerdam/netutil"
 )
 
 func main() {
@@ -32,11 +34,16 @@ func main() {
 			serveUsage()
 			return
 		}
-
-		err := inventory.Install("", os.Args[2], "templates", os.Args[6], os.Args[3])
+		db, err := netutil.OpenPostgresDBFromConfig(os.Args[3])
+		//err := inventory.Install("", os.Args[2], "templates", os.Args[6], os.Args[3])
+		err = inventory.Install("", os.Args[2], "templates", os.Args[6], db)
 		if err != nil {
 			log.Fatal(err)
 		}
+		//err = http.ListenAndServe(":80", nil)
+		//if err != nil {
+		//	log.Fatal("ListenAndServe: ", err)
+		//}
 		fmt.Println("Listening for connections on port 44443...")
 		err = http.ListenAndServeTLS(":44443", os.Args[4], os.Args[5], nil)
 		if err != nil {

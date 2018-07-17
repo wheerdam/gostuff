@@ -122,16 +122,7 @@ func LoginPage(w http.ResponseWriter, r *http.Request) {
 
 func LogoutPage(w http.ResponseWriter, r *http.Request) {
 	if !checkSession(w, r) {
-		t, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
-		msg := MessagePage{
-				Prefix: invPrefix,
-				Header:	"Logout Failed",
-				Message: template.HTML(
-						"<p>You were not logged in</p>" +
-						"<p><a href=\"" + invPrefix + "/login\">Login</a></p>",
-				),
-		}
-		t.Execute(w, msg)
+		return
 	} else {
 		s := session.Get(r)
 		session.Remove(s, w)
@@ -804,6 +795,21 @@ func checkSession(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
+func checkSessionNoMessage(r *http.Request) bool {
+	s := session.Get(r)
+	if s == nil {
+		return false
+	}
+	if s.CAttr("Inventory") == nil {
+		return false
+	}
+	inventoryToken := s.CAttr("Inventory").(string)
+	if inventoryToken != "Yes" {
+		return false
+	}
+	return true
+}
+
 func messageMustLogin(w http.ResponseWriter, r *http.Request) {
 	t, _ := template.ParseFiles(invTemplatePath + "/message.gtpl")
 	msg := MessagePage{
@@ -851,6 +857,7 @@ func Install(prefix string, usersFile string, templateDir string, staticDir stri
 	http.HandleFunc(invPrefix+"/download-inventory", DownloadInventoryHandler)
 	http.HandleFunc(invPrefix+"/browse", BrowsePage)
 	http.HandleFunc(invPrefix+"/search", SearchHandler)
+	http.HandleFunc(invPrefix+"/api/list", APIList)
 	fs := http.FileServer(http.Dir(staticDir))
 	http.Handle(invPrefix+"/static/", http.StripPrefix(invPrefix+"/static/", fs))
 	fmt.Println("Loading users data from '" + usersFile + "'...")
