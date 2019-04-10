@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"strings"
 	"io"
 	"time"
+	"strconv"
 	"io/ioutil"
 	"os/exec"
 	"html/template"
@@ -16,7 +18,7 @@ import (
 	"github.com/icza/session"
 )
 
-var path string
+var rootPath string
 var users *netutil.Users
 
 type MessagePage struct {
@@ -34,6 +36,7 @@ type ViewPage struct {
 	Dirs	[]interface{}
 	Medias	[]interface{}
 	Others	[]interface{}
+	Path 	string
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -137,7 +140,7 @@ func ViewHandler(w http.ResponseWriter, r *http.Request) {
 	if height == "" {
 		height = "25"
 	}
-	reqPath := path + "/" + userReqPath
+	reqPath := rootPath + "/" + userReqPath
 	f, err := os.Stat(reqPath)
 	if os.IsNotExist(err) {
 		t, _ := template.ParseFiles("templates/message.gtpl")
@@ -194,7 +197,7 @@ func ViewHandler(w http.ResponseWriter, r *http.Request) {
 		video, err := os.Open(reqPath)
 		if err != nil {
 			fmt.Println("'" + reqPath + "' failed to open: " + err.Error())
-			return 
+			return
 		}
 		defer video.Close()
 		http.ServeContent(w, r, reqPath, time.Now(), video)
@@ -296,7 +299,9 @@ func ViewHandler(w http.ResponseWriter, r *http.Request) {
 			MPost:	 "",
 			Dirs:	 make([]interface{}, 0),
 			Medias:	 make([]interface{}, 0),
-			Others:	 make([]interface{}, 0)}
+			Others:	 make([]interface{}, 0),
+			Path:    userReqPath,
+		}
 		fileCount := 0
 		unknownCount := 0
 		for _, file := range files {
@@ -309,7 +314,7 @@ func ViewHandler(w http.ResponseWriter, r *http.Request) {
 						"&" + curHeight +
 						"\">" +
 						file.Name() + "</a></p>"))
-			} else if scaling == "List" && isListable(file.Name()) {
+			} else if scaling == "List" { //&& isListable(file.Name()) {
 				page.Others = append(page.Others, 
 					template.HTML("<p><a href=\"" +
 						cur + "/" + file.Name() + "\">" +					
@@ -406,6 +411,22 @@ func ViewHandler(w http.ResponseWriter, r *http.Request) {
 		t, _ := template.ParseFiles("templates/view.gtpl")
 		t.Execute(w, page)
 	} else {
+		// prompt download otherwise
+		img, err := os.Open(reqPath)
+		if err != nil {
+			fmt.Println("'" + reqPath + "' failed to open: " + err.Error())
+			return // no response
+		}
+		defer img.Close()
+		fi, err := img.Stat()
+		if err != nil {
+			  // Could not obtain stat, handle error
+		}
+		w.Header().Set("Content-Disposition", "attachment; filename=\"" + filepath.Base(img.Name()) + "\"")
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
+		io.Copy(w, img)
+		/*
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
 				Header: "Unable to Handle File",
@@ -415,7 +436,132 @@ func ViewHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		t.Execute(w, msg)
 		return
+		*/
 	}
+}
+
+func GetHandler(w http.ResponseWriter, r *http.Request) {
+    if r.Method != "POST" {
+        http.Error(w, "Invalid HTTP Method", 400)
+        return
+    }
+	s := session.Get(r)
+	if s == nil {
+		t, _ := template.ParseFiles("templates/message.gtpl")
+		msg := MessagePage{
+				Header: "Not Logged In",
+				Message: template.HTML(
+						"<p>You were not logged in</p>" +
+						"<p><a href=\"./login\">Login</a></p>",
+				),
+		}
+		t.Execute(w, msg)
+		return
+	}
+	url := r.FormValue("url")
+	filePath := filepath.Join(rootPath, r.FormValue("path"), path.Base(url))
+	filePath = strings.Replace(filePath, ":", "_", -1)
+	filePath = strings.Replace(filePath, "?", "_", -1)
+    // Get the data
+    resp, err := http.Get(url)
+    if err != nil {
+		t, _ := template.ParseFiles("templates/message.gtpl")
+		msg := MessagePage{
+				Header: "Get Failed",
+				Message: template.HTML(
+						"<p>Fetch failed</p>",
+				),
+		}
+		t.Execute(w, msg)
+		return
+    }
+    defer resp.Body.Close()
+	mime := resp.Header.Get("Content-Type")
+	if mime == "image/jpeg" && !strings.HasSuffix(filePath, ".jpg") {
+		filePath = filePath + ".jpg"
+	} else if mime == "image/png" && !strings.HasSuffix(filePath, ".png") {
+		filePath = filePath + ".png"
+	}
+    // Create the file
+    out, err := os.Create(filePath)
+    if err != nil {
+		t, _ := template.ParseFiles("templates/message.gtpl")
+		msg := MessagePage{
+				Header: "Get Failed",
+				Message: template.HTML(
+						"<p>File open failed</p>",
+				),
+		}
+		t.Execute(w, msg)
+		return
+    }
+    defer out.Close()
+
+    // Write the body to file
+	fmt.Println("mime: '" + mime + "' writing to " + filePath)
+    _, err = io.Copy(out, resp.Body)
+	if err != nil {
+		t, _ := template.ParseFiles("templates/message.gtpl")
+		msg := MessagePage{
+				Header: "Get Failed",
+				Message: template.HTML(
+						"<p>File write failed</p>",
+				),
+		}
+		t.Execute(w, msg)
+		return
+	}
+	http.Redirect(w, r, r.Header.Get("Referer"), 302)
+}
+
+func UploadHandler(w http.ResponseWriter, r *http.Request) {
+    if r.Method != "POST" {
+        http.Error(w, "Invalid HTTP Method", 400)
+        return
+    }
+	s := session.Get(r)
+	if s == nil {
+		t, _ := template.ParseFiles("templates/message.gtpl")
+		msg := MessagePage{
+				Header: "Not Logged In",
+				Message: template.HTML(
+						"<p>You were not logged in</p>" +
+						"<p><a href=\"./login\">Login</a></p>",
+				),
+		}
+		t.Execute(w, msg)
+		return
+	}
+	r.ParseMultipartForm(32 << 20)
+    file, header, err := r.FormFile("upload")
+    if err != nil {
+		t, _ := template.ParseFiles("templates/message.gtpl")
+		msg := MessagePage{
+				Header: "Upload Failed",
+				Message: template.HTML(
+						"<p>Failed to get file</p>",
+				),
+		}
+		t.Execute(w, msg)
+        return
+    }
+    defer file.Close()
+    fileContents, err := ioutil.ReadAll(file)
+	filePath := filepath.Join(rootPath, r.FormValue("path"), header.Filename)
+	fmt.Println("writing to " + filePath)
+	err = ioutil.WriteFile(filePath, fileContents, 0644)
+	if err != nil {
+		t, _ := template.ParseFiles("templates/message.gtpl")
+		msg := MessagePage{
+				Header: "Upload Failed",
+				Message: template.HTML(
+						"<p>Failed to write file</p>",
+				),
+		}
+		t.Execute(w, msg)
+        return
+	}
+	http.Redirect(w, r, r.Header.Get("Referer"), 302)
 }
 
 func ThumbnailGenerator(w http.ResponseWriter, r *http.Request) {
@@ -437,7 +583,7 @@ func ThumbnailGenerator(w http.ResponseWriter, r *http.Request) {
 	curVid := "showvid=" + r.URL.Query().Get("showvid")
 	curScaling := "scaling=" + r.URL.Query().Get("scaling")
 	curHeight := "height=" + r.URL.Query().Get("height") 
-	reqPath := path + "/" + userReqPath
+	reqPath := rootPath + "/" + userReqPath
 	f, err := os.Stat(reqPath)
 	if os.IsNotExist(err) {
 		t, _ := template.ParseFiles("templates/message.gtpl")
@@ -542,15 +688,15 @@ func isListable(name string) (bool) {
 }
 
 func usage() {
-	fmt.Println("usage: mediaserve [path] [users-file] [static-path] (cert) (key)\n")
+	fmt.Println("usage: mediaserve [path] [users-file] [static-path] [port] (cert) (key)\n")
 }
 
 func main() {
-	if len(os.Args) != 4 && len(os.Args) != 6 {
+	if len(os.Args) != 5 && len(os.Args) != 7 {
 		usage()
 		return
 	}
-	path = os.Args[1]
+	rootPath = os.Args[1]
 	users = netutil.NewUsers()
 	err := users.LoadFromFile(os.Args[2])
 	if err != nil {
@@ -564,11 +710,13 @@ func main() {
 	http.HandleFunc("/thumbgen", ThumbnailGenerator)
 	http.HandleFunc("/login", LoginHandler)
 	http.HandleFunc("/logout", LogoutHandler)
+	http.HandleFunc("/upload", UploadHandler)
+	http.HandleFunc("/get", GetHandler)
 	http.HandleFunc("/", RootHandler)
 	if len(os.Args) == 6 {
-		err = http.ListenAndServeTLS(":18311", os.Args[4], os.Args[5], nil)
-	} else {		
-		err = http.ListenAndServe(":18310", nil)
+		err = http.ListenAndServeTLS(":"+os.Args[4], os.Args[5], os.Args[6], nil)
+	} else {
+		err = http.ListenAndServe(":"+os.Args[4], nil)
 	}
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
