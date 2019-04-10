@@ -532,7 +532,18 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		t.Execute(w, msg)
 		return
 	}
-	r.ParseMultipartForm(32 << 20)
+	err := r.ParseMultipartForm(32 << 20)
+    if err != nil {
+		t, _ := template.ParseFiles("templates/message.gtpl")
+		msg := MessagePage{
+				Header: "Upload Failed",
+				Message: template.HTML(
+						"<p>Failed to parse multipart form</p>",
+				),
+		}
+		t.Execute(w, msg)
+        return
+    }
     file, header, err := r.FormFile("upload")
     if err != nil {
 		t, _ := template.ParseFiles("templates/message.gtpl")
@@ -546,10 +557,11 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
     defer file.Close()
-    fileContents, err := ioutil.ReadAll(file)
 	filePath := filepath.Join(rootPath, r.FormValue("path"), header.Filename)
-	fmt.Println("writing to " + filePath)
-	err = ioutil.WriteFile(filePath, fileContents, 0644)
+	fmt.Println("(" + strconv.FormatInt(header.Size, 10) + " bytes) writing to " + filePath)
+    // fileContents, err := ioutil.ReadAll(file)
+	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0644)
+	defer f.Close()
 	if err != nil {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
@@ -561,6 +573,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		t.Execute(w, msg)
         return
 	}
+	io.Copy(f, file)
 	http.Redirect(w, r, r.Header.Get("Referer"), 302)
 }
 
