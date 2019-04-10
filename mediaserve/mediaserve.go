@@ -1,51 +1,51 @@
 package main
 
 import (
-	"fmt"
-	"log"
-	"os"
-	"path"
-	"strings"
-	"io"
-	"time"
-	"strconv"
-	"io/ioutil"
-	"os/exec"
-	"html/template"
-	"net/http"
-	"path/filepath"
 	"bbi/netutil"
+	"fmt"
 	"github.com/icza/session"
+	"html/template"
+	"io"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"os"
+	"os/exec"
+	"path"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 )
 
 var rootPath string
 var users *netutil.Users
 
 type MessagePage struct {
-	Header 	string
+	Header  string
 	Message interface{}
 }
 
 type ViewPage struct {
-	Header	string
-	Up		string
-	Options	interface{}
-	DirInfo	string
-	MPre	interface{}
-	MPost	interface{}
-	Dirs	[]interface{}
-	Medias	[]interface{}
-	Others	[]interface{}
-	Path 	string
+	Header  string
+	Up      string
+	Options interface{}
+	DirInfo string
+	MPre    interface{}
+	MPost   interface{}
+	Dirs    []interface{}
+	Medias  []interface{}
+	Others  []interface{}
+	Path    string
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-        t, _ := template.ParseFiles("templates/login.gtpl")
-        t.Execute(w, nil)
-    } else {
-        r.ParseForm()
-        // logic part of log in
+		t, _ := template.ParseFiles("templates/login.gtpl")
+		t.Execute(w, nil)
+	} else {
+		r.ParseForm()
+		// logic part of log in
 		userName := r.FormValue("username")
 		err := users.Login(userName, r.FormValue("password"))
 		if err != nil {
@@ -54,7 +54,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 				Header: "Login Failed",
 				Message: template.HTML(
 					"<p>Incorrect name and/or password was provided</p>" +
-					"<p><a href=\"./login\">Retry</a></p>",
+						"<p><a href=\"./login\">Retry</a></p>",
 				),
 			}
 			t.Execute(w, msg)
@@ -65,12 +65,12 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			s := session.NewSessionOptions(&session.SessOptions{
-					CAttrs: map[string]interface{}{"UserName": userName},
+				CAttrs: map[string]interface{}{"UserName": userName},
 			})
 			session.Add(s, w)
 			http.Redirect(w, r, "./view?path=.", 301)
 		}
-    }
+	}
 }
 
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
@@ -78,21 +78,21 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	if s == nil {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header:	"Logout Failed",
-				Message: template.HTML(
-						"<p>You were not logged in</p>" +
-						"<p><a href=\"./login\">Login</a></p>",
-				),
+			Header: "Logout Failed",
+			Message: template.HTML(
+				"<p>You were not logged in</p>" +
+					"<p><a href=\"./login\">Login</a></p>",
+			),
 		}
 		t.Execute(w, msg)
 	} else {
 		session.Remove(s, w)
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header: "Logged Out",
-				Message: template.HTML(
-						"<p><a href=\"./login\">Login</a></p>",
-				),
+			Header: "Logged Out",
+			Message: template.HTML(
+				"<p><a href=\"./login\">Login</a></p>",
+			),
 		}
 		t.Execute(w, msg)
 	}
@@ -107,11 +107,11 @@ func ViewHandler(w http.ResponseWriter, r *http.Request) {
 	if s == nil {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header: "Not Logged In",
-				Message: template.HTML(
-						"<p>You were not logged in</p>" +
-						"<p><a href=\"./login\">Login</a></p>",
-				),
+			Header: "Not Logged In",
+			Message: template.HTML(
+				"<p>You were not logged in</p>" +
+					"<p><a href=\"./login\">Login</a></p>",
+			),
 		}
 		t.Execute(w, msg)
 		return
@@ -126,10 +126,10 @@ func ViewHandler(w http.ResponseWriter, r *http.Request) {
 	if userReqPath == "" {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header: "No Path Specified",
-				Message: template.HTML(
-					"<p>You must specify path to resource with 'path='</p>",
-				),
+			Header: "No Path Specified",
+			Message: template.HTML(
+				"<p>You must specify path to resource with 'path='</p>",
+			),
 		}
 		t.Execute(w, msg)
 		return
@@ -145,26 +145,26 @@ func ViewHandler(w http.ResponseWriter, r *http.Request) {
 	if os.IsNotExist(err) {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header: "Path not Found",
-				Message: template.HTML(
-					"<p>Can not find '" + reqPath + "'</p>",
-				),
+			Header: "Path not Found",
+			Message: template.HTML(
+				"<p>Can not find '" + reqPath + "'</p>",
+			),
 		}
 		t.Execute(w, msg)
 		return
 	} else if err != nil {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header: "File status check failed",
-				Message: template.HTML(
-					"<p>Failed to check status for  '" + reqPath + "'</p>",
-				),
+			Header: "File status check failed",
+			Message: template.HTML(
+				"<p>Failed to check status for  '" + reqPath + "'</p>",
+			),
 		}
 		t.Execute(w, msg)
 		return
 	}
 	if strings.HasSuffix(strings.ToLower(reqPath), ".jpg") ||
-	   strings.HasSuffix(strings.ToLower(reqPath), ".jpeg") {
+		strings.HasSuffix(strings.ToLower(reqPath), ".jpeg") {
 		img, err := os.Open(reqPath)
 		if err != nil {
 			fmt.Println("'" + reqPath + "' failed to open: " + err.Error())
@@ -176,7 +176,7 @@ func ViewHandler(w http.ResponseWriter, r *http.Request) {
 	} else if strings.HasSuffix(strings.ToLower(reqPath), ".png") {
 		img, err := os.Open(reqPath)
 		if err != nil {
-		fmt.Println("'" + reqPath + "' failed to open: " + err.Error())
+			fmt.Println("'" + reqPath + "' failed to open: " + err.Error())
 			return // no response
 		}
 		defer img.Close()
@@ -185,15 +185,15 @@ func ViewHandler(w http.ResponseWriter, r *http.Request) {
 	} else if strings.HasSuffix(strings.ToLower(reqPath), ".gif") {
 		img, err := os.Open(reqPath)
 		if err != nil {
-		fmt.Println("'" + reqPath + "' failed to open: " + err.Error())
+			fmt.Println("'" + reqPath + "' failed to open: " + err.Error())
 			return // no response
 		}
 		defer img.Close()
 		w.Header().Set("Content-Type", "image/gif")
 		io.Copy(w, img)
-	} else if strings.HasSuffix(strings.ToLower(reqPath), ".webm") || 
-			strings.HasSuffix(strings.ToLower(reqPath), ".mkv") || 
-			strings.HasSuffix(strings.ToLower(reqPath), ".mp4") {
+	} else if strings.HasSuffix(strings.ToLower(reqPath), ".webm") ||
+		strings.HasSuffix(strings.ToLower(reqPath), ".mkv") ||
+		strings.HasSuffix(strings.ToLower(reqPath), ".mp4") {
 		video, err := os.Open(reqPath)
 		if err != nil {
 			fmt.Println("'" + reqPath + "' failed to open: " + err.Error())
@@ -228,7 +228,7 @@ func ViewHandler(w http.ResponseWriter, r *http.Request) {
 		options := "<span style=\"margin-right: 10px\">"
 		if showVid == "Yes" {
 			options = options + "<a href=\"" + cur + "&showvid=No&" +
-				curScaling + "&" + curHeight + "\">-Vid</a> " 
+				curScaling + "&" + curHeight + "\">-Vid</a> "
 		} else {
 			options = options + "<a href=\"" + cur + "&showvid=Yes&" +
 				curScaling + "&" + curHeight + "\">+Vid</a> "
@@ -291,64 +291,64 @@ func ViewHandler(w http.ResponseWriter, r *http.Request) {
 			"TG </a>"
 		options = options + "</span>"
 		page := ViewPage{
-			Header:	 userReqPath,
-			Up:		 "./view?path=" + filepath.Dir("./" + userReqPath) +
-						"&" + curVid + "&" + curScaling + "&" + curHeight,
+			Header: userReqPath,
+			Up: "./view?path=" + filepath.Dir("./"+userReqPath) +
+				"&" + curVid + "&" + curScaling + "&" + curHeight,
 			Options: template.HTML(options),
-			MPre:	 "",
-			MPost:	 "",
-			Dirs:	 make([]interface{}, 0),
-			Medias:	 make([]interface{}, 0),
-			Others:	 make([]interface{}, 0),
+			MPre:    "",
+			MPost:   "",
+			Dirs:    make([]interface{}, 0),
+			Medias:  make([]interface{}, 0),
+			Others:  make([]interface{}, 0),
 			Path:    userReqPath,
 		}
 		fileCount := 0
 		unknownCount := 0
 		for _, file := range files {
 			if file.IsDir() {
-				page.Dirs = append(page.Dirs, 
-					template.HTML("<p>&#128193; <a href=\"./view?" +
-						"path=" + userReqPath + "/" + file.Name() +
-						"&" + curVid + 
-						"&" + curScaling +
-						"&" + curHeight +
-						"\">" +
-						file.Name() + "</a></p>"))
+				page.Dirs = append(page.Dirs,
+					template.HTML("<p>&#128193; <a href=\"./view?"+
+						"path="+userReqPath+"/"+file.Name()+
+						"&"+curVid+
+						"&"+curScaling+
+						"&"+curHeight+
+						"\">"+
+						file.Name()+"</a></p>"))
 			} else if scaling == "List" { //&& isListable(file.Name()) {
-				page.Others = append(page.Others, 
-					template.HTML("<p><a href=\"" +
-						cur + "/" + file.Name() + "\">" +					
-						file.Name() + "</a></p>"))
+				page.Others = append(page.Others,
+					template.HTML("<p><a href=\""+
+						cur+"/"+file.Name()+"\">"+
+						file.Name()+"</a></p>"))
 				fileCount++
 			} else if scaling == "ListPreview" && isListable(file.Name()) {
 				page.MPre = template.HTML("<table>")
 				page.MPost = template.HTML("</table>")
 				if isImage(file.Name()) {
-					prefix := "<tr><td style=\"vertical-align: middle;\"><a href=\"" + cur + "/" + 
+					prefix := "<tr><td style=\"vertical-align: middle;\"><a href=\"" + cur + "/" +
 						file.Name() + "\">"
-					suffix := "</a></td><td><a href=\"" + cur + "/" + 
+					suffix := "</a></td><td><a href=\"" + cur + "/" +
 						file.Name() + "\"><span style=\"vertical-align: middle;\">" + file.Name() + "</span></a></td></tr>"
 					imgAttr := "height=\"100px\" style=\"vertical-align: middle;\""
 					page.Medias = append(page.Medias,
-						template.HTML(prefix + "<img src=\"./view?path=" +
-							userReqPath + "/" + file.Name() + "\" " +
-							imgAttr + "> " + suffix))
+						template.HTML(prefix+"<img src=\"./view?path="+
+							userReqPath+"/"+file.Name()+"\" "+
+							imgAttr+"> "+suffix))
 				} else if isVideo(file.Name()) {
-					prefix := "<tr><td style=\"vertical-align: middle;\"><a href=\"" + cur + "/" + 
+					prefix := "<tr><td style=\"vertical-align: middle;\"><a href=\"" + cur + "/" +
 						file.Name() + "\">"
-					suffix := "</a></td><td><a href=\"" + cur + "/" + 
+					suffix := "</a></td><td><a href=\"" + cur + "/" +
 						file.Name() + "\"><span style=\"vertical-align: middle;\">" + file.Name() + "</span></a></td></tr>"
 					imgAttr := "height=\"100px\" style=\"vertical-align: middle;\""
 					page.Medias = append(page.Medias,
-						template.HTML(prefix + "<img src=\"./view?path=" +
-							userReqPath + "/" + file.Name() + ".thumb.jpg\" " +
-							imgAttr + "> " + suffix))
+						template.HTML(prefix+"<img src=\"./view?path="+
+							userReqPath+"/"+file.Name()+".thumb.jpg\" "+
+							imgAttr+"> "+suffix))
 				} else {
-					page.Others = append(page.Others, 
-						template.HTML("<p><a href=\"" +
-							cur + "/" + file.Name() + "\">" +					
-							file.Name() + "</a></p>"))
-				fileCount++
+					page.Others = append(page.Others,
+						template.HTML("<p><a href=\""+
+							cur+"/"+file.Name()+"\">"+
+							file.Name()+"</a></p>"))
+					fileCount++
 				}
 				fileCount++
 			} else {
@@ -361,44 +361,44 @@ func ViewHandler(w http.ResponseWriter, r *http.Request) {
 				case "Thumbnail":
 					imgAttr = "height=\"" + height + "%\""
 				}
-				if isImage(file.Name()) && 
-						!strings.HasSuffix(file.Name(), ".thumb.jpg") {
+				if isImage(file.Name()) &&
+					!strings.HasSuffix(file.Name(), ".thumb.jpg") {
 					prefix := ""
 					suffix := ""
 					if scaling == "Thumbnail" {
-						prefix = "<a href=\"" + cur + "/" + 
+						prefix = "<a href=\"" + cur + "/" +
 							file.Name() + "\">"
 						suffix = "</a>"
 					}
 					page.Medias = append(page.Medias,
-						template.HTML(prefix + "<img src=\"./view?path=" +
-							userReqPath + "/" + file.Name() + "\" " +
-							imgAttr + ">" + suffix + " "))
+						template.HTML(prefix+"<img src=\"./view?path="+
+							userReqPath+"/"+file.Name()+"\" "+
+							imgAttr+">"+suffix+" "))
 					fileCount++
 				} else if isVideo(file.Name()) {
 					prefix := ""
 					suffix := ""
 					video := ""
 					if showVid != "Yes" {
-						prefix = "<a href=\"" + cur + "/" + 
+						prefix = "<a href=\"" + cur + "/" +
 							file.Name() + "\">"
-						video = "<img " + imgAttr + 
+						video = "<img " + imgAttr +
 							" src=\"" + cur + "/" +
 							file.Name() + ".thumb.jpg\">"
 						suffix = "</a>"
 					} else {
-						video = "<video " + imgAttr + 
+						video = "<video " + imgAttr +
 							" src=\"" + cur + "/" +
 							file.Name() + "\" autoplay loop muted></video>"
 					}
 					page.Medias = append(page.Medias,
-						template.HTML(prefix + video + suffix))
+						template.HTML(prefix+video+suffix))
 					fileCount++
 				} else if isListable(file.Name()) {
-					page.Others = append(page.Others, 
-						template.HTML("<p><a href=\"" +
-							cur + "/" + file.Name() + "\">" +					
-							file.Name() + "</a></p>"))
+					page.Others = append(page.Others,
+						template.HTML("<p><a href=\""+
+							cur+"/"+file.Name()+"\">"+
+							file.Name()+"</a></p>"))
 					fileCount++
 				} else if !strings.HasSuffix(file.Name(), ".thumb.jpg") {
 					unknownCount++
@@ -420,40 +420,40 @@ func ViewHandler(w http.ResponseWriter, r *http.Request) {
 		defer img.Close()
 		fi, err := img.Stat()
 		if err != nil {
-			  // Could not obtain stat, handle error
+			// Could not obtain stat, handle error
 		}
-		w.Header().Set("Content-Disposition", "attachment; filename=\"" + filepath.Base(img.Name()) + "\"")
+		w.Header().Set("Content-Disposition", "attachment; filename=\""+filepath.Base(img.Name())+"\"")
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
 		io.Copy(w, img)
 		/*
-		t, _ := template.ParseFiles("templates/message.gtpl")
-		msg := MessagePage{
-				Header: "Unable to Handle File",
-				Message: template.HTML(
-					"<p>Unable to handle '" + reqPath + "'</p>",
-				),
-		}
-		t.Execute(w, msg)
-		return
+			t, _ := template.ParseFiles("templates/message.gtpl")
+			msg := MessagePage{
+					Header: "Unable to Handle File",
+					Message: template.HTML(
+						"<p>Unable to handle '" + reqPath + "'</p>",
+					),
+			}
+			t.Execute(w, msg)
+			return
 		*/
 	}
 }
 
 func GetHandler(w http.ResponseWriter, r *http.Request) {
-    if r.Method != "POST" {
-        http.Error(w, "Invalid HTTP Method", 400)
-        return
-    }
+	if r.Method != "POST" {
+		http.Error(w, "Invalid HTTP Method", 400)
+		return
+	}
 	s := session.Get(r)
 	if s == nil {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header: "Not Logged In",
-				Message: template.HTML(
-						"<p>You were not logged in</p>" +
-						"<p><a href=\"./login\">Login</a></p>",
-				),
+			Header: "Not Logged In",
+			Message: template.HTML(
+				"<p>You were not logged in</p>" +
+					"<p><a href=\"./login\">Login</a></p>",
+			),
 		}
 		t.Execute(w, msg)
 		return
@@ -462,51 +462,51 @@ func GetHandler(w http.ResponseWriter, r *http.Request) {
 	filePath := filepath.Join(rootPath, r.FormValue("path"), path.Base(url))
 	filePath = strings.Replace(filePath, ":", "_", -1)
 	filePath = strings.Replace(filePath, "?", "_", -1)
-    // Get the data
-    resp, err := http.Get(url)
-    if err != nil {
+	// Get the data
+	resp, err := http.Get(url)
+	if err != nil {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header: "Get Failed",
-				Message: template.HTML(
-						"<p>Fetch failed</p>",
-				),
+			Header: "Get Failed",
+			Message: template.HTML(
+				"<p>Fetch failed</p>",
+			),
 		}
 		t.Execute(w, msg)
 		return
-    }
-    defer resp.Body.Close()
+	}
+	defer resp.Body.Close()
 	mime := resp.Header.Get("Content-Type")
 	if mime == "image/jpeg" && !strings.HasSuffix(filePath, ".jpg") {
 		filePath = filePath + ".jpg"
 	} else if mime == "image/png" && !strings.HasSuffix(filePath, ".png") {
 		filePath = filePath + ".png"
 	}
-    // Create the file
-    out, err := os.Create(filePath)
-    if err != nil {
-		t, _ := template.ParseFiles("templates/message.gtpl")
-		msg := MessagePage{
-				Header: "Get Failed",
-				Message: template.HTML(
-						"<p>File open failed</p>",
-				),
-		}
-		t.Execute(w, msg)
-		return
-    }
-    defer out.Close()
-
-    // Write the body to file
-	fmt.Println("mime: '" + mime + "' writing to " + filePath)
-    _, err = io.Copy(out, resp.Body)
+	// Create the file
+	out, err := os.Create(filePath)
 	if err != nil {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header: "Get Failed",
-				Message: template.HTML(
-						"<p>File write failed</p>",
-				),
+			Header: "Get Failed",
+			Message: template.HTML(
+				"<p>File open failed</p>",
+			),
+		}
+		t.Execute(w, msg)
+		return
+	}
+	defer out.Close()
+
+	// Write the body to file
+	fmt.Println("mime: '" + mime + "' writing to " + filePath)
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		t, _ := template.ParseFiles("templates/message.gtpl")
+		msg := MessagePage{
+			Header: "Get Failed",
+			Message: template.HTML(
+				"<p>File write failed</p>",
+			),
 		}
 		t.Execute(w, msg)
 		return
@@ -515,63 +515,65 @@ func GetHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
-    if r.Method != "POST" {
-        http.Error(w, "Invalid HTTP Method", 400)
-        return
-    }
+	if r.Method != "POST" {
+		http.Error(w, "Invalid HTTP Method", 400)
+		return
+	}
 	s := session.Get(r)
 	if s == nil {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header: "Not Logged In",
-				Message: template.HTML(
-						"<p>You were not logged in</p>" +
-						"<p><a href=\"./login\">Login</a></p>",
-				),
+			Header: "Not Logged In",
+			Message: template.HTML(
+				"<p>You were not logged in</p>" +
+					"<p><a href=\"./login\">Login</a></p>",
+			),
 		}
 		t.Execute(w, msg)
 		return
 	}
+	fmt.Println("UploadHandler: parsing")
 	err := r.ParseMultipartForm(32 << 20)
-    if err != nil {
+	if err != nil {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header: "Upload Failed",
-				Message: template.HTML(
-						"<p>Failed to parse multipart form</p>",
-				),
+			Header: "Upload Failed",
+			Message: template.HTML(
+				"<p>Failed to parse multipart form</p>",
+			),
 		}
 		t.Execute(w, msg)
-        return
-    }
-    file, header, err := r.FormFile("upload")
-    if err != nil {
+		return
+	}
+	fmt.Println("UploadHandler: getting file info")
+	file, header, err := r.FormFile("upload")
+	if err != nil {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header: "Upload Failed",
-				Message: template.HTML(
-						"<p>Failed to get file</p>",
-				),
+			Header: "Upload Failed",
+			Message: template.HTML(
+				"<p>Failed to get file</p>",
+			),
 		}
 		t.Execute(w, msg)
-        return
-    }
-    defer file.Close()
+		return
+	}
+	defer file.Close()
 	filePath := filepath.Join(rootPath, r.FormValue("path"), header.Filename)
-	fmt.Println("(" + strconv.FormatInt(header.Size, 10) + " bytes) writing to " + filePath)
-    // fileContents, err := ioutil.ReadAll(file)
+	fmt.Println("UploadHandler: (" + strconv.FormatInt(header.Size, 10) + " bytes) writing to " + filePath)
+	// fileContents, err := ioutil.ReadAll(file)
 	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0644)
 	defer f.Close()
 	if err != nil {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header: "Upload Failed",
-				Message: template.HTML(
-						"<p>Failed to write file</p>",
-				),
+			Header: "Upload Failed",
+			Message: template.HTML(
+				"<p>Failed to write file</p>",
+			),
 		}
 		t.Execute(w, msg)
-        return
+		return
 	}
 	io.Copy(f, file)
 	http.Redirect(w, r, r.Header.Get("Referer"), 302)
@@ -582,11 +584,11 @@ func ThumbnailGenerator(w http.ResponseWriter, r *http.Request) {
 	if s == nil {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header: "Not Logged In",
-				Message: template.HTML(
-						"<p>You were not logged in</p>" +
-						"<p><a href=\"./login\">Login</a></p>",
-				),
+			Header: "Not Logged In",
+			Message: template.HTML(
+				"<p>You were not logged in</p>" +
+					"<p><a href=\"./login\">Login</a></p>",
+			),
 		}
 		t.Execute(w, msg)
 		return
@@ -595,26 +597,26 @@ func ThumbnailGenerator(w http.ResponseWriter, r *http.Request) {
 	done := r.URL.Query().Get("done")
 	curVid := "showvid=" + r.URL.Query().Get("showvid")
 	curScaling := "scaling=" + r.URL.Query().Get("scaling")
-	curHeight := "height=" + r.URL.Query().Get("height") 
+	curHeight := "height=" + r.URL.Query().Get("height")
 	reqPath := rootPath + "/" + userReqPath
 	f, err := os.Stat(reqPath)
 	if os.IsNotExist(err) {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header: "Path not Found",
-				Message: template.HTML(
-					"<p>Can not find '" + reqPath + "'</p>",
-				),
+			Header: "Path not Found",
+			Message: template.HTML(
+				"<p>Can not find '" + reqPath + "'</p>",
+			),
 		}
 		t.Execute(w, msg)
 		return
 	} else if err != nil {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header: "File status check failed",
-				Message: template.HTML(
-					"<p>Failed to check status for  '" + reqPath + "'</p>",
-				),
+			Header: "File status check failed",
+			Message: template.HTML(
+				"<p>Failed to check status for  '" + reqPath + "'</p>",
+			),
 		}
 		t.Execute(w, msg)
 		return
@@ -622,10 +624,10 @@ func ThumbnailGenerator(w http.ResponseWriter, r *http.Request) {
 	if !f.IsDir() {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header: "Path is not a directory",
-				Message: template.HTML(
-					"<p>'" + reqPath + "' needs to be a directory</p>",
-				),
+			Header: "Path is not a directory",
+			Message: template.HTML(
+				"<p>'" + reqPath + "' needs to be a directory</p>",
+			),
 		}
 		t.Execute(w, msg)
 		return
@@ -647,7 +649,7 @@ func ThumbnailGenerator(w http.ResponseWriter, r *http.Request) {
 			_, err = os.Stat(fileName + ".thumb.jpg")
 			if os.IsNotExist(err) {
 				args := []string{"-y", "-ss", "00:00:01", "-i",
-				fileName, "-vframes", "1", fileName + ".thumb.jpg"}
+					fileName, "-vframes", "1", fileName + ".thumb.jpg"}
 				out, err := exec.Command(cmd, args...).CombinedOutput()
 				output = output + fmt.Sprintf("%s", out)
 				if err != nil {
@@ -660,41 +662,41 @@ func ThumbnailGenerator(w http.ResponseWriter, r *http.Request) {
 	if done == "" {
 		t, _ := template.ParseFiles("templates/message.gtpl")
 		msg := MessagePage{
-				Header: "Thumbnail Generation Output",
-				Message: template.HTML(
-					"<div align=\"left\"><pre>" + output + "</pre></div>",
-				),
+			Header: "Thumbnail Generation Output",
+			Message: template.HTML(
+				"<div align=\"left\"><pre>" + output + "</pre></div>",
+			),
 		}
 		t.Execute(w, msg)
 	} else {
-		http.Redirect(w, r, "./view?path=" + done +
-			"&" + curVid + "&" + curScaling + "&" + curHeight, 301)
+		http.Redirect(w, r, "./view?path="+done+
+			"&"+curVid+"&"+curScaling+"&"+curHeight, 301)
 	}
 }
 
-func isImage(name string) (bool) {
+func isImage(name string) bool {
 	lName := strings.ToLower(name)
 	return strings.HasSuffix(lName, ".png") ||
-		   strings.HasSuffix(lName, ".gif") ||
-		   strings.HasSuffix(lName, ".jpg") ||
-		   strings.HasSuffix(lName, ".jpeg")
+		strings.HasSuffix(lName, ".gif") ||
+		strings.HasSuffix(lName, ".jpg") ||
+		strings.HasSuffix(lName, ".jpeg")
 }
 
-func isVideo(name string) (bool) {
+func isVideo(name string) bool {
 	lName := strings.ToLower(name)
 	return strings.HasSuffix(lName, ".mp4") ||
-		   strings.HasSuffix(lName, ".mkv") ||
-		   strings.HasSuffix(lName, ".webm")
+		strings.HasSuffix(lName, ".mkv") ||
+		strings.HasSuffix(lName, ".webm")
 }
 
-func isText(name string) (bool) {
+func isText(name string) bool {
 	lName := strings.ToLower(name)
 	return strings.HasSuffix(lName, ".txt") ||
-		   strings.HasSuffix(lName, ".text") ||
-		   strings.HasSuffix(lName, ".html")
+		strings.HasSuffix(lName, ".text") ||
+		strings.HasSuffix(lName, ".html")
 }
 
-func isListable(name string) (bool) {
+func isListable(name string) bool {
 	lName := strings.ToLower(name)
 	return (isImage(lName) || isVideo(lName) || isText(lName)) &&
 		!strings.HasSuffix(lName, ".thumb.jpg")
